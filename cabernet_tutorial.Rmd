@@ -1,0 +1,98 @@
+---
+title: "testingCabernetPackage.Rmd"
+author: "Alice Yu"
+date: "9/26/2019"
+output: html_document
+---
+
+# Importing libraries
+```{r}
+# For cabernet
+library(qgraph); 
+library(data.table); library(igraph);
+library(glasso); 
+library(tidyverse);
+
+# Other
+library(GEOquery); 
+```
+
+Load cabernet R package
+```{r}
+source('/Users/aliceyu/Desktop/Project2018_2/cabernet.R')
+source('/Users/aliceyu/Desktop/Project2018_2/cabernet_functions.R')
+```
+
+# Reading in U01 data from GEO
+```{r}
+exp.data <- read.table('/Users/aliceyu/Desktop/currentprojs/SubnetworkProject/U01Data/processed_U01.tsv', header=T, row.names=1)
+
+g <- getGEO('GSE111907')
+pdata <- pData(g$GSE111907_series_matrix.txt.gz)
+strsplit.ind <- seq(from=3, by=3, length.out = nrow(pdata))
+meta <- data.table(pdata, stringsAsFactors = F) %>%
+  mutate(tumname = as.character(characteristics_ch1)) %>%
+  mutate(tumname = unlist(base::strsplit(tumname, " "))[strsplit.ind]) %>%
+  select(tumname, characteristics_ch1.3) %>%
+  unique()
+
+adeno <- pull(meta %>% 
+  filter(characteristics_ch1.3 == 'histology: Adenocarcinoma') %>%
+  select(tumname))
+
+squamous = pull(meta %>% 
+  filter(characteristics_ch1.3 == 'histology: Squamous cell carcinoma') %>%
+  select(tumname))
+
+tumornum <- unlist(lapply(colnames(exp.data), 
+                          function(x) {strsplit(x, "_")[[1]][1]}))
+
+# Separating adeno and squam samples in the U01 dataset
+adeno.data <- exp.data[,which(tumornum %in% adeno)]
+squam.data <- exp.data[,which(tumornum %in% squamous)]
+
+# Input from users, format cell marker in the list and the cell name is in the names of the vector
+cellmarkers <- c("CD45", "CD31", "CD10", "Ep")
+names(cellmarkers) <- c("I", "E", "F", "M")
+```
+
+Clean function in cabernet package
+```{r}
+cellexp.list <- cleanData(adeno.data, cellmarkers, 5)
+```
+
+Loading data -> needs to be imported into the R package
+```{r}
+load('/Users/aliceyu/Desktop/Project2018/rdata/gbiogrid.RData')
+lr.filtered <- read_tsv('/Users/aliceyu/Desktop/Project2018_2/LR_filt_093019.txt')
+load('/Users/aliceyu/Desktop/currentprojs/SubnetworkProject/pathwaygenelist.RData')
+pathway.genes <- unique(unlist(pathway.genelist$genesets))
+```
+
+Generating cell type specific ligand and receptor pair network
+```{r}
+lr.net <- generateLRnet(lr.filtered, names(cellmarkers), cellexp.list, pathway.genes)
+```
+
+# Generating cell type specific down stream network
+```{r}
+set.seed(30)
+ec.nodes <- pickECgenes(lr.net$mat, 
+                        cellexp.list, 
+                        pathway.genelist$genesets, 2)
+```
+
+#Running cabernet
+```{r}
+cab.results <- cabernet(lr.net, cellexp.list, ec.nodes, 30)
+
+## TO-DO: Add in bootstrap ability
+```
+
+```{r}
+write.csv(cab.results, file="adeno_cabernet_100319.csv")
+```
+
+
+
+
