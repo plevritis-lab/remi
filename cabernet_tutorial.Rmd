@@ -8,10 +8,9 @@ output: html_document
 # Importing libraries
 ```{r}
 # For cabernet
-library(qgraph); 
-library(data.table); library(igraph);
-library(glasso); 
-library(tidyverse);
+libs <- c("qgraph", "data.table", "igraph", "glasso", "tidyverse",
+          "Matrix", "OneR")
+lapply(libs, library, character.only = TRUE)
 
 # Other
 library(GEOquery); 
