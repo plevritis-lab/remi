@@ -115,8 +115,6 @@ calculateDegree <- function(net, communities, dat) {
   names(deg.comm) <- unique(communities)
   max_num <- max(ncol(dat), 5)
   oversized.comms <- which(deg.comm > max_num)
-  print("Degree")
-  print(max(deg.comm))
   return(names(oversized.comms))
 }
 
@@ -134,12 +132,11 @@ calculateDegree <- function(net, communities, dat) {
 runGlasso <- function(nodes, dat, lr, num) {
   lr.mat <- dat[which(rownames(dat) %in% nodes),]
   
-  W <- calculateCommGlasso(t(lr.mat), lr)
+  W <- calculateCommGlasso2(t(lr.mat), lr)
   lr.W <- W %>% 
     mutate(commnum = num) %>%
     mutate(commsize = length(nodes)) %>%
-    dplyr::select(node1, node2, weight, cor, commnum, commsize)
-  
+    dplyr::select(node1, node2, weight, cor, commnum, commsize, pval)
   return(lr.W)
 }
 
@@ -183,8 +180,8 @@ calculateCommGlasso <- function(x, lr) {
   colnames(W) <- c("node1", "node2", "weight", "cor")
   W[,"node1"] <- colnames(x)[ind[,1]]
   W[,"node2"] <- colnames(x)[ind[,2]]
-  W[,"weight"] <- getGlassoEdges(e)
-  W[,"cor"] <- getCorEdges(cor(x, method="pearson"))
+  W[,"weight"] <- getUpperTri(e)
+  W[,"cor"] <- getUpperTri(cor(x, method="pearson"))
   return(data.frame(W, stringsAsFactors = F))
 }
 
@@ -237,7 +234,7 @@ EBICglassoCore2 <- function (S, n, gamma = 0.5, penalize.diagonal = FALSE, nlamb
   lambda = exp(seq(log(lambda.min), log(lambda.max), length = nlambda))
   nlambda <- length(lambda)
   if (missing(penalizeMatrix)) {
-    res <- glasso(S, lambda[i], trace=0,
+    res <- glasso::glasso(S, lambda[i], trace=0,
                   penalize.diagonal = penalize.diagonal, ...)
   }
   else {
@@ -245,7 +242,7 @@ EBICglassoCore2 <- function (S, n, gamma = 0.5, penalize.diagonal = FALSE, nlamb
                       wi = array(0, c(ncol(S), ncol(S), length(lambda))), 
                       rholist = lambda)
     for (i in 1:nlambda) {
-      res <- glasso(S, lambda[i], trace=0,
+      res <- glasso::glasso(S, lambda[i], trace=0,
                     zero = penalizeMatrix,
                     penalize.diagonal = penalize.diagonal, ...)
       
@@ -349,7 +346,6 @@ logGaus <- function (S, K, n)
   return(n/2 * (log(det(K)) - tr(KS)))
 }
 
-
 #' Given graphical lasso matrix form output, extract edges by 
 #' looking at rows vs. column elements
 #' 
@@ -357,20 +353,8 @@ logGaus <- function (S, K, n)
 #' @return List form of predicted edges
 #' @export
 #' 
-getGlassoEdges <- function(fit) {
+getUpperTri<- function(fit) {
   fit.net <- sign(fit)
   fit.ind <- which(upper.tri(fit.net,diag=F) , arr.ind=T)
   return(round(fit[fit.ind],2))
-}
-
-#' Getting correlation edges given correlation matrix by looking
-#' at row vs. column element
-#' 
-#' @param cor.mat matrix of correlation values
-#' @return flattened list of correlation values
-#' @export
-#' 
-getCorEdges <- function(cor.mat) {
-  cor.ind <- which(upper.tri(cor.mat, diag=F), arr.ind=T)
-  return(round(cor.mat[cor.ind],2))
 }

@@ -17,7 +17,7 @@ system.file("extdata", "LR_pairs_filt.txt", package="cabernet")
 cleanData <- function(dat, cellmarkers, var) {
   cellexps <- list()
   dat.cols <- unique(unlist(lapply(colnames(dat), 
-                       function(x) {strsplit(x, "_")[[1]][1]})))
+                                   function(x) {strsplit(x, "_")[[1]][1]})))
   for(i in 1:length(cellmarkers)) {
     curr.name <- names(cellmarkers)[i]
     celltype.filt <- dat[,grep(cellmarkers[i], colnames(dat))]
@@ -27,7 +27,7 @@ cleanData <- function(dat, cellmarkers, var) {
     b <- as.numeric(bin(genemean, var))
     names(b) <- rownames(celltype.filt)
     removegenes <- names(b[b == 1])
-
+    
     # Finalized cleaned data matrix
     cleaned.filt <- celltype.filt[-which(rownames(celltype.filt) %in% removegenes),]
     rownames(cleaned.filt) <- paste0(curr.name, "_", rownames(cleaned.filt))
@@ -116,7 +116,7 @@ calculateCor <- function(lr.table, dat.list) {
     
     l.exp <- as.numeric(allcellexp[which(rownames(allcellexp) == ligand),])
     r.exp <- as.numeric(allcellexp[which(rownames(allcellexp) ==
-                                               receptor),])
+                                           receptor),])
     
     pairwise.lr[i,3] <- mean(l.exp)
     pairwise.lr[i,4] <- mean(r.exp)
@@ -143,16 +143,17 @@ calculateCor <- function(lr.table, dat.list) {
 #' @return List of receptors with high scoring eigenvector centrality measurements
 #' @export
 #' 
-pickECgenes <- function(lr.table, dat.list, pgenelist, numgenes) {
+pickECgenes <- function(lr.table, dat.list, pgenelist, numgenes, cutoff, seed=10) {
+  set.seed(seed)
   pgenes <- unlist(pgenelist)
-
+  
   cell.nets <- list()
   for(c in names(dat.list)) {
     receive.exp <- dat.list[[c]]
     receive.net <- makeNetwork(receive.exp, lr.table$L, pgenes, c)
     cell.nets[[c]] <- receive.net
   }
-  
+
   cell.ec.list <- list()
   all.ec <- c()
   for(c in names(dat.list)) {
@@ -168,14 +169,23 @@ pickECgenes <- function(lr.table, dat.list, pgenelist, numgenes) {
     for(p1 in 1:length(pathway.genelist$genesets)) {
       cell.path.all <- paste0(c, "_", pathway.genelist$genesets[[p1]])
       singler.path <- unique(intersect(cell.path.all, lr.table$R))
-      top.genes <- head(sort(cell.ec.list[[c]][singler.path], decreasing=T), numgenes)
+      top.genes <- head(sort(cell.ec.list[[c]][singler.path], decreasing=T), 
+                        numgenes)
       sig.top.r.path <- c(sig.top.r.path, names(top.genes))
     }
   }
   
-  return(unique(sig.top.r.path))
-}
+  allcellexp <- dat.list[[names(dat.list)[1]]]
+  for(c in names(dat.list)[2:length(dat.list)]) {
+    allcellexp <- rbind(allcellexp, dat.list[[c]])
+  }
+
+  sig.path.exp <- allcellexp[which(rownames(allcellexp) %in% unique(sig.top.r.path)),]
+  sig.path.high <- sig.path.exp[which(rowMeans(sig.path.exp) > cutoff),]
   
+  return(rownames(sig.path.high))
+}
+
 #' cabernetCommunities
 #' 
 #' Community detection ft. label propagation and louvain clustering on
@@ -211,7 +221,7 @@ cabernetCommunities <- function(net, dat.list, lnodes, seed) {
     louvain.comms <- clusterLouvain(net, num.oversized, old.comms)
     num.oversized <- calculateDegree(net, louvain.comms, dat.list[[1]])
     if(length(setdiff(num.oversized, old.oversized)) == 0) {
-      break
+      next 
     }
     old.comms <- louvain.comms
     old.oversized <- num.oversized
@@ -236,29 +246,23 @@ cabernetGlasso <- function(netlist, communities, dat.list, seednum) {
   for(c in names(dat.list)[2:length(dat.list)]) {
     allcellexp <- rbind(allcellexp, dat.list[[c]])
   }
-
-  gedges_w <- matrix("", nrow=0, ncol=4)
-  colnames(gedges_w) <- c("node1", "node2", "weight", "cor")
+  
+  gedges_w <- matrix("", nrow=0, ncol=7)
+  colnames(gedges_w) <- c("node1", "node2", "weight", "cor", 
+                          "commnum", "commsize", "pval")
   
   # Graphical Lasso within edges
   for(i in unique(communities)) {
     commgenes <- names(communities[communities == i])
     lr.mat <- t(allcellexp[which(rownames(allcellexp) %in% commgenes),])
+    lr.comm.net <- induced_subgraph(netlist$net, colnames(lr.mat))
+    W <- calculateCommGlasso2(lr.mat, netlist$mat)
+    lr.W <- data.table(W) %>% 
+      mutate(commnum = i) %>%
+      mutate(commsize = length(commgenes)) %>%
+      dplyr::select(node1, node2, weight, cor, commnum, commsize, pval)
     
-    if(ncol(lr.mat) >  2) {
-      lr.comm.net <- induced_subgraph(netlist$net, colnames(lr.mat))
-      W <- calculateCommGlasso(lr.mat, netlist$mat)
-      lr.W <- data.table(W) %>% 
-        dplyr::select(node1, node2, weight, cor)
-      
-      gedges_w <- rbind(gedges_w, lr.W)
-    } else if(ncol(lr.mat) == 2) {
-      cor.res <- round(cor(lr.mat)[1,2], 3)
-      rname <- intersect(colnames(netlist$mat), netlist$mat$R)
-      lrmat.two <- t(data.table(c(colnames(lr.mat), cor.res, cor.res)))
-      colnames(lrmat.two) <- c("node1", "node2", "weight", "cor")
-      gedges_w <- rbind(gedges_w, lrmat.two)
-    }
+    gedges_w <- rbind(gedges_w, lr.W)
   }
   
   # Graphical Lasso between edges
@@ -277,19 +281,23 @@ cabernetGlasso <- function(netlist, communities, dat.list, seednum) {
           mutate(sum = comm1+comm2) %>%
           filter(sum == i+j)
         
-        betweengenes <- c(all_edges_m$name1, all_edges_m$name2)
+        betweengenes <- unique(c(all_edges_m$name1, all_edges_m$name2))
         
         if(length(betweengenes) > 1) {
-          between.lr <- runGlasso(betweengenes, 
-                                  allcellexp, netlist$mat, 
-                                  paste0(i, "_", j)) %>%
-            dplyr::select(node1, node2, weight, cor)
-          gedges_w <- rbind(gedges_w, between.lr)
+          
+          lr.mat <- t(allcellexp[which(rownames(allcellexp) %in% betweengenes),])
+          W <- calculateCommGlasso2(lr.mat, netlist$mat)
+          betweenlr.W <- data.table(W) %>% 
+            mutate(commnum = paste0(i, "_", j)) %>%
+            mutate(commsize = length(betweengenes)) %>%
+            dplyr::select(node1, node2, weight, cor, commnum, commsize, pval)
+
+          gedges_w <- rbind(gedges_w, betweenlr.W)
         }
       }
     }
   }
-  colnames(gedges_w) <- c("L", "R", "weight","cor")
+  
   return(gedges_w)
 }
 
@@ -312,25 +320,27 @@ cabernet <- function(netlist, dat.list, labelednodes, seed) {
   commdetect.output <- cabernetCommunities(netlist$net, dat.list, labelednodes, seed)
   # Graphical Lasso
   glasso.output <- cabernetGlasso(netlist, commdetect.output, dat.list, seed)
+  
   # Return final results
   strsplit.ind <- seq(from=1, by=2, length.out = nrow(glasso.output))
   strsplit.ind2 <- seq(from=2, by=2, length.out = nrow(glasso.output))
   net.edges <- data.table(glasso.output) %>% 
-    mutate(n1cell = unlist(strsplit(L, split="_"))[strsplit.ind]) %>%
-    mutate(n2cell = unlist(strsplit(R, split="_"))[strsplit.ind]) %>%
-    mutate(ligand = unlist(strsplit(L, split="_"))[strsplit.ind2]) %>%
-    mutate(receptor = unlist(strsplit(R, split="_"))[strsplit.ind2]) %>%
+    mutate(n1cell = unlist(strsplit(node1, split="_"))[strsplit.ind]) %>%
+    mutate(n2cell = unlist(strsplit(node2, split="_"))[strsplit.ind]) %>%
+    mutate(ligand = unlist(strsplit(node1, split="_"))[strsplit.ind2]) %>%
+    mutate(receptor = unlist(strsplit(node2, split="_"))[strsplit.ind2]) %>%
     mutate(celltypes = paste0(n1cell, "_", n2cell)) %>%
-    dplyr::select(L, R, ligand, receptor, n1cell, n2cell, weight, cor)
+    dplyr::select(node1, node2, ligand, receptor, n1cell, n2cell, 
+                  weight, cor, commsize, commnum, pval)
   
   # need to switch the cell type
   for(i in 1:nrow(net.edges)) {
-    if(net.edges[i,"L"] %in% lr.net$mat$R) {
-      temp.name <- net.edges[i,"R"]
+    if(net.edges[i,"node1"] %in% lr.net$mat$R) {
+      temp.name <- net.edges[i,"node2"]
       temp.cell <- net.edges[i,"n2cell"]
       temp.solo <- net.edges[i,"receptor"]
-      net.edges[i,"R"] <- net.edges[i,"L"]
-      net.edges[i,"L"] <- temp.name
+      net.edges[i,"node2"] <- net.edges[i,"node1"]
+      net.edges[i,"node1"] <- temp.name
       net.edges[i,"n2cell"] <- net.edges[i,"n1cell"]
       net.edges[i,"n1cell"] <- temp.cell
       net.edges[i,"receptor"] <- net.edges[i,"ligand"]
@@ -339,16 +349,17 @@ cabernet <- function(netlist, dat.list, labelednodes, seed) {
   }
   
   predicted.edges <- net.edges %>%
-    mutate(pairname = paste0(L, "_", R)) %>%
+    mutate(pairname = paste0(node1, "_", node2)) %>%
     mutate(cc = paste0(n1cell, "_", n2cell)) %>%
     group_by(pairname) %>%
     filter(weight == max(weight)) %>%
-    filter(weight > 0) %>%
+    mutate(adj.pval = p.adjust(pval, method="BH")) %>%
+    filter(as.numeric(weight) > 0) %>%
     ungroup() %>%
     filter(pairname %in% netlist$mat$combo1) %>%
     unique()
   
-  return(predicted.edges)
+  return(list(edges=predicted.edges, mat=commdetect.output))
 }
 
 #' Bootstrap cabernet results
