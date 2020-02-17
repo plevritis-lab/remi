@@ -18,13 +18,13 @@ library(GEOquery);
 
 Load cabernet R package
 ```{r}
-source('/Users/aliceyu/Desktop/Project2018_2/cabernet.R')
-source('/Users/aliceyu/Desktop/Project2018_2/cabernet_functions.R')
+source('/Users/ayu1/Documents/GitHub/cabernet/cabernet.R')
+source('/Users/ayu1/Documents/GitHub/cabernet/cabernet_functions.R')
 ```
 
 # Reading in U01 data from GEO
 ```{r}
-exp.data <- read.table('/Users/aliceyu/Desktop/currentprojs/SubnetworkProject/U01Data/processed_U01.tsv', header=T, row.names=1)
+exp.data <- read.table('/Users/ayu1/Documents/cabernet/processed_U01.tsv', header=T, row.names=1)
 
 g <- getGEO('GSE111907')
 pdata <- pData(g$GSE111907_series_matrix.txt.gz)
@@ -84,14 +84,6 @@ ec.nodes <- pickECgenes(lr.net$mat,
 #Running cabernet
 ```{r}
 cab.results <- cabernet(lr.net, cellexp.list, ec.nodes, 30)
-
-## TO-DO: Add in bootstrap ability
 ```
-
-```{r}
-write.csv(cab.results, file="adeno_cabernet_100319.csv")
-```
-
-
 
 

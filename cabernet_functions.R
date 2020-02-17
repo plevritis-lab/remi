@@ -1,6 +1,6 @@
 #' Making network function
 #' 
-#' Given the dataset and genes, make a protein-protein interaction
+#' Given the dataset and genes, make a protein-protein interaction network
 #' using BioGRID as a base network
 #' 
 #' @param data Gene expression data
@@ -11,7 +11,7 @@
 #' @export
 #' 
 makeNetwork <- function(data, filt.genes, pathgenes, c) {
-  rownames(data) <- toupper(rownames(data))
+  #rownames(data) <- toupper(rownames(data))
   
   # Selecting pathway genes from BioGRID
   pathgenes <- paste0(c, "_", pathgenes)
@@ -30,6 +30,7 @@ makeNetwork <- function(data, filt.genes, pathgenes, c) {
   if(nrow(edgelist) == 0) {
     return(NULL)
   }
+  
   # Calculating edge weights
   cor.edges <- cor(t(data[which(rownames(data) %in% V(net)$name),]), 
                    method="pearson")
@@ -59,15 +60,22 @@ makeNetwork <- function(data, filt.genes, pathgenes, c) {
 #' 
 clusterLabelProp <- function(net, clu, clu.labeled, labelednodes) {
   final.comm <- clu[clu %in% setdiff(unique(clu), clu.labeled)]
+
   for(cc in clu.labeled) {
     clu.net <- induced_subgraph(net, names(clu[clu==cc]))
     initclu <- seq(0, vcount(clu.net)-1)
     names(initclu) <- V(clu.net)$name
     initclu[-which(names(initclu) %in% labelednodes)] <- -1
-    #fixclu <- rep(FALSE, vcount(clu.net))
-    #fixclu[names(initclu) %in% labelednodes] <- TRUE
+    
+    fixclu <- rep(FALSE, vcount(clu.net))
+    fixclu[names(initclu) %in% labelednodes] <- TRUE
     clu.comm <- membership(cluster_label_prop(clu.net, initial=initclu))
-    final.comm <- c(final.comm, clu.comm+max(final.comm))
+    
+    if(is.finite(max(final.comm))) {
+      final.comm <- c(final.comm, clu.comm+max(final.comm))
+    } else {
+      final.comm <- clu.comm
+    }
   }
   return(final.comm)
 }
@@ -94,7 +102,6 @@ clusterLouvain <- function(net, commnums, communities) {
   return(final.comms)
 }
 
-
 #' Calculating the degree of each community in a network
 #' 
 #' Used to assess significance of the network relative to the
@@ -106,53 +113,34 @@ clusterLouvain <- function(net, commnums, communities) {
 #' @return List of maximum degree in each community
 #' @export
 #' 
-calculateDegree <- function(net, communities, dat) {
+calculateOversizedComms <- function(net, communities, dat) {
   deg.comm <- c()
   for(i in unique(communities)){
-    comm.net <- induced_subgraph(net, names(communities[communities==i]))
-    deg.comm <- c(deg.comm, max(igraph::degree(comm.net)))
+    deg.comm <- c(deg.comm, 
+                  calculateNetVars(net, 
+                                   names(communities[communities==i]))$deg)
   }
   names(deg.comm) <- unique(communities)
-  max_num <- max(ncol(dat), 5)
+  max_num <- max(ncol(dat), 10)
   oversized.comms <- which(deg.comm > max_num)
   return(names(oversized.comms))
 }
 
-#' Run Graphical Lasso
-#' 
-#' Applying graphical lasso to each community
-#' 
-#' @param nodes genes in community
-#' @param dat gene expression matrix
-#' @param lr ligand receptor pairs
-#' @param num community number
-#' @return List of glasso results
-#' @export 
-#' 
-runGlasso <- function(nodes, dat, lr, num) {
-  lr.mat <- dat[which(rownames(dat) %in% nodes),]
-  
-  W <- calculateCommGlasso2(t(lr.mat), lr)
-  lr.W <- W %>% 
-    mutate(commnum = num) %>%
-    mutate(commsize = length(nodes)) %>%
-    dplyr::select(node1, node2, weight, cor, commnum, commsize, pval)
-  return(lr.W)
+calculateNetVars<- function(net, genes) {
+  comm.net <- induced_subgraph(net, genes)
+  degree <- max(igraph::degree(comm.net))
+  numedges <- vcount(comm.net)
+  return(list(deg=degree, numedges=numedges))
 }
 
-
-#' Graphical lasso wrapper to EBICglasso 
-#' 
-#' 
-#' @param x matrix of community gene expressions
-#' @param lr list of LR pairs
-#' @return A network
-#' @export
-#' 
-calculateCommGlasso <- function(x, lr) {
+calculateCommGlasso <- function(x, netlist) {
+  net <- netlist$net
+  lr <- netlist$mat
+  
   n <- nrow(x)
   d <- ncol(x)
-  s <- cov(x)
+  #x <- scale(x) * sqrt((n - 1)/n)
+  S <- cov(x)
   
   pmat.zero <- data.table(t(combn(seq(1,ncol(x)),2))) %>%
     mutate(A = colnames(x)[V1]) %>%
@@ -162,29 +150,46 @@ calculateCommGlasso <- function(x, lr) {
     mutate(R = ifelse(B %in% lr$L, 1, 0)) %>%
     filter(!(AB %in% c(lr$combo1, lr$combo2))) 
   
-  pmat.zero <- pmat.zero %>% dplyr::select(V1, V2)
+  pmat.zero <- as.matrix(pmat.zero %>% dplyr::select(V1, V2))
   
   if(nrow(pmat.zero) == 0) {
-    e <- EBICglasso2(s, n=nrow(x), gamma=0, penalizeMatrix=NULL)
-    if(nrow(s) == 2) {
-      e <- cov2cor(s)
-    }
-    
-  } else {
-    e <- EBICglasso2(s, n=nrow(x), gamma=0, 
-                     penalizeMatrix=as.matrix(pmat.zero))
+    pmat.zero <- NULL
   }
   
-  ind <- which( upper.tri(e, diag=F) , arr.ind = TRUE )
-  W <- matrix(0, nrow(ind),4)
-  colnames(W) <- c("node1", "node2", "weight", "cor")
+  bic <- c()
+  lambda.max <- 0.9
+  lambda.min <- 0.1
+  lambdas = exp(seq(log(lambda.min), log(lambda.max), length = 20))
+  for(l in lambdas) {
+    res <- glasso(S, l, zero = pmat.zero, thr=1e-08)
+    bic <- c(bic, EBIC(S, res$wi, n, 0, countDiagonal = F))
+  }
+  
+  # Pick optimal lambda
+  opt.lambda <- lambdas[which.min(bic)]
+  
+  e <- glasso(S, opt.lambda, zero=pmat.zero, thr=1e-08)
+  
+  #pred.edges <- as.matrix(wi2net(e$wi))
+  pred.edges <- wi2net(e$wi)
+  
+  net.vars <- calculateNetVars(net, colnames(x))
+  
+  # Output
+  ind <- which( upper.tri(pred.edges, diag=F) , arr.ind = TRUE )
+  W <- matrix(0, nrow(ind), 6)
+  colnames(W) <- c("node1", "node2", 
+                   "weight", 
+                   "cor", "deg", 
+                   "numedges")
   W[,"node1"] <- colnames(x)[ind[,1]]
   W[,"node2"] <- colnames(x)[ind[,2]]
-  W[,"weight"] <- getUpperTri(e)
-  W[,"cor"] <- getUpperTri(cor(x, method="pearson"))
+  W[,"weight"] <- getUpperTri(pred.edges, round = TRUE)
+  W[,"deg"] <- net.vars$deg
+  W[,"numedges"] <- net.vars$numedges
+  W[,"cor"] <- getUpperTri(cor(x, method="pearson"), round = TRUE)
   return(data.frame(W, stringsAsFactors = F))
 }
-
 
 #' Log Likelihood
 #' 
@@ -195,122 +200,6 @@ calculateCommGlasso <- function(x, lr) {
 #' 
 loglik_ave <- function(data, theta){
   return(-(log(det(theta)) - sum(diag(var(data) %*% theta))))
-}
-
-#' EBICglasso function from the EBICglasso package. 
-#' Removed check for positive definite matrix
-#' 
-#' @param S covariance matrix
-#' @param n sample number
-#' @return EBICglasso output
-#' @export
-#' 
-EBICglasso2 <- function (S, n, gamma = 0.5, penalize.diagonal = FALSE, 
-                         nlambda = 100, lambda.min.ratio = 0.001, 
-                         returnAllResults = FALSE, checkPD = TRUE, 
-                         penalizeMatrix, countDiagonal = FALSE, 
-                         refit = FALSE, threshold = FALSE, verbose = TRUE, ...) 
-{
-  EBICglassoCore2(S = S, n = n, gamma = gamma, penalize.diagonal = penalize.diagonal, 
-                  nlambda = nlambda, lambda.min.ratio = lambda.min.ratio, 
-                  returnAllResults = returnAllResults, checkPD = checkPD, 
-                  penalizeMatrix = penalizeMatrix, countDiagonal = countDiagonal, 
-                  refit = refit, ebicMethod = "old", regularized = TRUE, 
-                  threshold = threshold, verbose = verbose, ...)
-}
-
-
-EBICglassoCore2 <- function (S, n, gamma = 0.5, penalize.diagonal = FALSE, nlambda = 100, 
-                             lambda.min.ratio = 0.01, returnAllResults = FALSE, checkPD = TRUE, 
-                             penalizeMatrix, countDiagonal = FALSE, refit = TRUE, ebicMethod = c("new", 
-                                                                                                 "old"), regularized = TRUE, threshold = FALSE, verbose = TRUE, 
-                             ...) 
-{
-  ebicMethod <- match.arg(ebicMethod)
-  S <- cov2cor(S)
-  lambda.max = max(max(S - diag(nrow(S))), -min(S - diag(nrow(S))))
-  lambda.min = lambda.min.ratio * lambda.max
-  
-  lambda = exp(seq(log(lambda.min), log(lambda.max), length = nlambda))
-  nlambda <- length(lambda)
-  if (missing(penalizeMatrix)) {
-    res <- glasso::glasso(S, lambda[i], trace=0,
-                  penalize.diagonal = penalize.diagonal, ...)
-  }
-  else {
-    glas_path <- list(w = array(0, c(ncol(S), ncol(S), length(lambda))), 
-                      wi = array(0, c(ncol(S), ncol(S), length(lambda))), 
-                      rholist = lambda)
-    for (i in 1:nlambda) {
-      res <- glasso::glasso(S, lambda[i], trace=0,
-                    zero = penalizeMatrix,
-                    penalize.diagonal = penalize.diagonal, ...)
-      
-      glas_path$w[, , i] <- res$w
-      glas_path$wi[, , i] <- res$wi
-    }
-  }
-  if (threshold) {
-    for (i in 1:nlambda) {
-      p <- ncol(glas_path$wi[, , i])
-      thresh <- (log(p * (p - 1)/2))/sqrt(n)
-      glas_path$wi[, , i] <- ifelse(abs(glas_path$wi[, 
-                                                     , i]) < thresh, 0, glas_path$wi[, , i])
-    }
-  }
-  if (ebicMethod == "old") {
-    EBICs <- sapply(seq_along(lambda), function(i) {
-      if (!regularized) {
-        invSigma <- ggmFit(wi2net(glas_path$wi[, , i]), 
-                           S, sampleSize = n, ebicTuning = gamma, refit = TRUE, 
-                           verbose = FALSE)$invSigma
-      }
-      else {
-        invSigma <- glas_path$wi[, , i]
-      }
-      EBIC(S, invSigma, n, gamma, countDiagonal = countDiagonal)
-    })
-  }
-  else {
-    EBICs <- sapply(seq_along(lambda), function(i) {
-      fit <- ggmFit(wi2net(glas_path$wi[, , i]), S, n, 
-                    ebicTuning = gamma, refit = !regularized, verbose = FALSE)
-      fit$fitMeasures$ebic
-    })
-  }
-  opt <- which.min(EBICs)
-  
-  net <- as.matrix(forceSymmetric(wi2net(glas_path$wi[, , 
-                                                      opt])))
-  colnames(net) <- rownames(net) <- colnames(S)
-  
-  if (refit) {
-    if (verbose) 
-      message("Refitting network without LASSO regularization")
-    if (!all(net[upper.tri(net)] != 0)) {
-      glassoRes <- suppressWarnings(glasso::glasso(S, 
-                                                   0, zero = which(net == 0 & upper.tri(net), arr.ind = TRUE), 
-                                                   trace = 0, penalize.diagonal = penalize.diagonal, 
-                                                   ...))
-    }
-    else {
-      glassoRes <- suppressWarnings(glasso::glasso(S, 
-                                                   0, trace = 0, penalize.diagonal = penalize.diagonal, 
-                                                   ...))
-    }
-    net <- as.matrix(forceSymmetric(wi2net(glassoRes$wi)))
-    colnames(net) <- rownames(net) <- colnames(S)
-    optwi <- glassoRes$wi
-  }
-  else {
-    optwi <- glas_path$wi[, , opt]
-  }
-  
-  if (returnAllResults) {
-    return(list(results = glas_path, ebic = EBICs, optnet = net, 
-                lambda = lambda, optwi = optwi))
-  }
-  else return(net)
 }
 
 #' EBIC calculation
@@ -353,8 +242,12 @@ logGaus <- function (S, K, n)
 #' @return List form of predicted edges
 #' @export
 #' 
-getUpperTri<- function(fit) {
+getUpperTri<- function(fit, round=TRUE) {
   fit.net <- sign(fit)
-  fit.ind <- which(upper.tri(fit.net,diag=F) , arr.ind=T)
-  return(round(fit[fit.ind],2))
+  fit.ind <- which(upper.tri(fit.net, diag=F) , arr.ind=T)
+  if(round == TRUE) {
+    return(round(fit[fit.ind],2))
+  } else {
+    return(fit[fit.ind])
+  }
 }
