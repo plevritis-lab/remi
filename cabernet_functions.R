@@ -10,24 +10,22 @@
 #' @return A network
 #' @export
 #' 
-makeNetwork <- function(data, filt.genes, pathgenes, c) {
+makeNetwork <- function(data, filt.genes, pathgenes, c, ppi=g.biogrid) {
   #rownames(data) <- toupper(rownames(data))
   
   # Selecting pathway genes from BioGRID
   pathgenes <- paste0(c, "_", pathgenes)
-  
   pathgenes <- intersect(pathgenes, rownames(data))
   
-  temp.biogrid <- g.biogrid
-  V(temp.biogrid)$name <- paste0(c, "_", V(temp.biogrid)$name)
+  V(ppi)$name <- paste0(c, "_", V(ppi)$name)
   
-  net <- induced_subgraph(temp.biogrid, 
-                          intersect(setdiff(pathgenes, filt.genes), 
-                                    V(temp.biogrid)$name))
+  net <- induced_subgraph(ppi, intersect(setdiff(pathgenes, filt.genes), 
+                                    V(ppi)$name))
   
   edgelist <- as_edgelist(net)
   
   if(nrow(edgelist) == 0) {
+    print("No PPI edges")
     return(NULL)
   }
   
@@ -60,7 +58,7 @@ makeNetwork <- function(data, filt.genes, pathgenes, c) {
 #' 
 clusterLabelProp <- function(net, clu, clu.labeled, labelednodes) {
   final.comm <- clu[clu %in% setdiff(unique(clu), clu.labeled)]
-
+  
   for(cc in clu.labeled) {
     clu.net <- induced_subgraph(net, names(clu[clu==cc]))
     initclu <- seq(0, vcount(clu.net)-1)
@@ -71,12 +69,13 @@ clusterLabelProp <- function(net, clu, clu.labeled, labelednodes) {
     fixclu[names(initclu) %in% labelednodes] <- TRUE
     clu.comm <- membership(cluster_label_prop(clu.net, initial=initclu))
     
-    if(is.finite(max(final.comm))) {
+    if(length(final.comm) != 0) {
       final.comm <- c(final.comm, clu.comm+max(final.comm))
     } else {
       final.comm <- clu.comm
     }
   }
+  
   return(final.comm)
 }
 
