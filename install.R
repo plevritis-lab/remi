@@ -1,0 +1,13 @@
+install.packages(
+  c(
+    'Seurat',
+    'qgraph', 
+    'data.table', 
+    'igraph', 
+    'glasso', 
+    'tidyverse',
+    'OneR', 
+    'Matrix', 
+    'circlize'
+  )
+)

@@ -10,24 +10,21 @@
 #' @return A network
 #' @export
 #' 
-makeNetwork <- function(data, filt.genes, pathgenes, c, ppi=g.biogrid) {
-  #rownames(data) <- toupper(rownames(data))
-  
+makePPINetwork <- function(data, filt.genes, pathgenes, c, ppi=g.biogrid) {
   # Selecting pathway genes from BioGRID
-  pathgenes <- paste0(c, "_", pathgenes)
-  pathgenes <- intersect(pathgenes, rownames(data))
-  
+  pathgenes <- intersect(paste0(c, "_", pathgenes), rownames(data))
   V(ppi)$name <- paste0(c, "_", V(ppi)$name)
   
-  net <- induced_subgraph(ppi, intersect(setdiff(pathgenes, filt.genes), 
-                                    V(ppi)$name))
+  overlap.genes <- intersect(setdiff(pathgenes, filt.genes), V(ppi)$name)
   
+  net <- igraph::induced_subgraph(ppi, vids=overlap.genes)
+  #print(vcount(net))
   edgelist <- as_edgelist(net)
   
-  if(nrow(edgelist) == 0) {
-    print("No PPI edges")
-    return(NULL)
-  }
+  if(nrow(edgelist) < 2) {
+    print(paste0(c, " has no PPI edges"))
+    return(NA)
+  } 
   
   # Calculating edge weights
   cor.edges <- cor(t(data[which(rownames(data) %in% V(net)$name),]), 
@@ -56,6 +53,32 @@ makeNetwork <- function(data, filt.genes, pathgenes, c, ppi=g.biogrid) {
 #' @return Communities identified using label propagation
 #' @export
 #' 
+findAdjacentCommEdges <- function(netlist, cgenes, comms) {
+  all_edges <- E(netlist$net)[inc(cgenes)]
+  all_edges_m <- data.table(get.edges(netlist$net, all_edges)) %>%
+    mutate(name1 = V(netlist$net)$name[V1]) %>%
+    mutate(name2 = V(netlist$net)$name[V2]) %>%
+    mutate(comm1 = comms$membership[name1]) %>%
+    mutate(comm2 = comms$membership[name2]) %>%
+    mutate(pairname = paste0(name1, "_", name2))
+  
+  return(all_edges_m)
+}
+
+#' Clustering using label propagation
+#' 
+#' This is the initial clustering step in cabernet. The network is
+#' seeded with receptors that had a high eigenvector centrality
+#' measurement to produce clusters that reflect downstream signaling
+#' activity seen in the dataset.
+#' 
+#' @param net LR network
+#' @param clu Components in the network
+#' @param clu.labeled Communities that contain at least two EC receptors
+#' @param labelednodes List of EC receptors
+#' @return Communities identified using label propagation
+#' @export
+#' 
 clusterLabelProp <- function(net, clu, clu.labeled, labelednodes) {
   final.comm <- clu[clu %in% setdiff(unique(clu), clu.labeled)]
   
@@ -67,7 +90,9 @@ clusterLabelProp <- function(net, clu, clu.labeled, labelednodes) {
     
     fixclu <- rep(FALSE, vcount(clu.net))
     fixclu[names(initclu) %in% labelednodes] <- TRUE
-    clu.comm <- membership(cluster_label_prop(clu.net, initial=initclu))
+    clu.comm <- membership(cluster_label_prop(clu.net, 
+                                              fixed=fixclu,
+                                              initial=initclu))
     
     if(length(final.comm) != 0) {
       final.comm <- c(final.comm, clu.comm+max(final.comm))
@@ -117,59 +142,97 @@ calculateOversizedComms <- function(net, communities, dat) {
   for(i in unique(communities)){
     deg.comm <- c(deg.comm, 
                   calculateNetVars(net, 
-                                   names(communities[communities==i]))$deg)
+                                   names(communities[communities==i]))$numnodes)
   }
   names(deg.comm) <- unique(communities)
-  max_num <- max(ncol(dat), 10)
+  max_num <- max(ncol(dat), 15)
   oversized.comms <- which(deg.comm > max_num)
   return(names(oversized.comms))
 }
 
+#' Calculating the degree of each community in a network
+#' 
+#' Used to assess significance of the network relative to the
+#' sample size of the dataset
+#' 
+#' @param net LR network
+#' @param communites Communities of interest
+#' @param dat Dataset of one cell type
+#' @return List of maximum degree in each community
+#' @export
+#' 
 calculateNetVars<- function(net, genes) {
   comm.net <- induced_subgraph(net, genes)
   degree <- max(igraph::degree(comm.net))
-  numedges <- vcount(comm.net)
-  return(list(deg=degree, numedges=numedges))
+  numedges <- ecount(comm.net)
+  numnodes <- vcount(comm.net)
+  return(list(deg=degree, numedges=numedges, numnodes=numnodes))
 }
 
-calculateCommGlasso <- function(x, netlist) {
+#' Calculating the degree of each community in a network
+#' 
+#' Used to assess significance of the network relative to the
+#' sample size of the dataset
+#' 
+#' @param net LR network
+#' @param communites Communities of interest
+#' @param dat Dataset of one cell type
+#' @return List of maximum degree in each community
+#' @export
+#' 
+calculateCommGlasso <- function(S, x, netlist, lambda.max = 0.9, scale=F, additional=NULL) {
   net <- netlist$net
   lr <- netlist$mat
   
   n <- nrow(x)
   d <- ncol(x)
-  #x <- scale(x) * sqrt((n - 1)/n)
-  S <- cov(x)
+  #if(scale==T) {
+  #  x <- scale(x) * sqrt((n - 1)/n)
+  #}
   
-  pmat.zero <- data.table(t(combn(seq(1,ncol(x)),2))) %>%
+  #S <- cor(x)
+  
+  allLRpairs <- c(lr$combo1, lr$combo2)
+  filtallLRpairs <- setdiff(allLRpairs, additional)
+  
+  pmat.all <- data.table(t(combn(seq(1,ncol(x)),2))) %>%
     mutate(A = colnames(x)[V1]) %>%
     mutate(B = colnames(x)[V2]) %>%
-    mutate(AB = paste0(A, "_", B)) %>%
-    mutate(L = ifelse(A %in% lr$L, 1, 0)) %>%
-    mutate(R = ifelse(B %in% lr$L, 1, 0)) %>%
-    filter(!(AB %in% c(lr$combo1, lr$combo2))) 
+    mutate(AB = paste0(A, "_", B)) 
+  
+  pmat.zero <- pmat.all %>%
+    filter(!(AB %in% filtallLRpairs)) 
   
   pmat.zero <- as.matrix(pmat.zero %>% dplyr::select(V1, V2))
+  
+  pmat.one <- pmat.all %>%
+    filter(AB %in% filtallLRpairs)
+  
+  #if(!(is.null(additional))) {
+  #  print(dim(pmat.one)) 
+  #}
   
   if(nrow(pmat.zero) == 0) {
     pmat.zero <- NULL
   }
   
   bic <- c()
-  lambda.max <- 0.9
-  lambda.min <- 0.1
+  lambda.min <- 0.01
   lambdas = exp(seq(log(lambda.min), log(lambda.max), length = 20))
   for(l in lambdas) {
-    res <- glasso(S, l, zero = pmat.zero, thr=1e-08)
+    res <- glasso(S, l, 
+                  zero = pmat.zero, 
+                  thr=1e-08)
     bic <- c(bic, EBIC(S, res$wi, n, 0, countDiagonal = F))
   }
   
   # Pick optimal lambda
   opt.lambda <- lambdas[which.min(bic)]
   
-  e <- glasso(S, opt.lambda, zero=pmat.zero, thr=1e-08)
+  e <- glasso(S, opt.lambda, 
+              zero=pmat.zero, 
+              thr=1e-08)
   
-  #pred.edges <- as.matrix(wi2net(e$wi))
   pred.edges <- wi2net(e$wi)
   
   net.vars <- calculateNetVars(net, colnames(x))
@@ -180,14 +243,19 @@ calculateCommGlasso <- function(x, netlist) {
   colnames(W) <- c("node1", "node2", 
                    "weight", 
                    "cor", "deg", 
-                   "numedges")
+                   "numgenes")
   W[,"node1"] <- colnames(x)[ind[,1]]
   W[,"node2"] <- colnames(x)[ind[,2]]
   W[,"weight"] <- getUpperTri(pred.edges, round = TRUE)
   W[,"deg"] <- net.vars$deg
-  W[,"numedges"] <- net.vars$numedges
+  W[,"numgenes"] <- net.vars$numnodes
   W[,"cor"] <- getUpperTri(cor(x, method="pearson"), round = TRUE)
-  return(data.frame(W, stringsAsFactors = F))
+  
+  #if(!(is.null(additional))) {
+  #  print(W)
+  ##}
+  #return(W)
+  return(list(W=data.frame(W, stringsAsFactors = F), S=S))
 }
 
 #' Log Likelihood
