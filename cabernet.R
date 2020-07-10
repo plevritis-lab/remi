@@ -38,21 +38,14 @@ pathway.genes <- unique(unlist(pathway.genelist$genesets))
 setupData <- function(dat, cellmarkers, filter=T, var = 3) {
   filtered.cellexps <- list()
   notfiltered.cellexps <- list()
-  
+
   colsvec <- c()
   for(i in 1:length(cellmarkers)) {
-    curr.name <- cellmarkers[i]
-    nospace.name <- as.character(gsub(" ", "", curr.name))
-    
-    print(curr.name)
-    all.cols <- unlist(lapply(colnames(dat), 
-                              function(x) {strsplit(x, "_")[[1]][2]}))
-    all.cols <- gsub(" ", "", all.cols)
-    
-    celltype.filt <- dat[,grep(paste0("\\b", nospace.name, "\\b"), all.cols)]
-    
-    dat.cols <- unlist(lapply(colnames(celltype.filt), 
-                              function(x) {strsplit(x, "_")[[1]][1]}))
+    curr.name <- names(cellmarkers)[i]
+    celltype.filt <- dat[,grep(cellmarkers[i], colnames(dat))]
+
+    dat.cols <- unique(unlist(lapply(colnames(celltype.filt), 
+                                     function(x) {strsplit(x, "_")[[1]][1]})))
     
     rownames(celltype.filt) <- paste0(curr.name, "_", rownames(celltype.filt))
     colnames(celltype.filt) <- dat.cols
@@ -63,7 +56,6 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
     genemean <- rowMeans(celltype.filt)
     
     b <- as.numeric(OneR::bin(genemean, var))
-    
     names(b) <- rownames(celltype.filt)
     removegenes <- names(b[b == 1])
     
@@ -73,9 +65,9 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
     filtered.cellexps[[curr.name]] <- cleaned.filt
     notfiltered.cellexps[[curr.name]] <- celltype.filt
   }
-  
+
   allpresent.cols <- names(which(table(colsvec) == length(cellmarkers))) 
-  
+
   #Filtering non-filtered data
   for(c in names(notfiltered.cellexps)) {
     allpresent.filt.data <- notfiltered.cellexps[[c]][,allpresent.cols]
@@ -88,7 +80,6 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
     }
   }
   
-  # Only using samples that have all the cell types of interest
   for(c in names(filtered.cellexps)) {
     allpresent.filt.data <- filtered.cellexps[[c]][,allpresent.cols]
     duplicate.cols <- which(apply(allpresent.filt.data, 1, 
@@ -170,11 +161,18 @@ expandLRpairs <- function(lr.table, datlist, celltypes) {
 #' 
 generateLRnet <- function(lr.table, celltypes, datlist, cor=T) {
   
+  print("step1")
   lr.network.pairs <- expandLRpairs(lr.table, datlist, celltypes)
+  
+  print("step2")
   pairwise.cor <- calculateCor(lr.network.pairs, datlist)
+  print("step3")
   lr.network <- graph_from_edgelist(as.matrix(lr.network.pairs[,c(1,2)]), 
                                     directed=F)
   E(lr.network)$weight <- abs(as.numeric(paste0(pairwise.cor$cor)))
+  #cor.edges <- as.numeric(paste0(pairwise.cor$cor))
+  #E(lr.network)$weight <- cor.edges*cor.edges
+  #E(lr.network)$weight <- as.numeric(paste0(pairwise.cor$cor))
   return(list(net=lr.network, mat=lr.network.pairs))
 }
 
@@ -314,7 +312,7 @@ cabernetCommunities <- function(net, dat.list, lnodes, seed) {
   if(length(unique(labelprop.comms)) == 1) {
     labelprop.comms <- membership(cluster_louvain(net))
   }
-    
+  
   # Calculate degree of each network and check how many are 
   num.oversized <- calculateOversizedComms(net, labelprop.comms, dat.list[[1]])
   
@@ -322,9 +320,11 @@ cabernetCommunities <- function(net, dat.list, lnodes, seed) {
   old.comms <- labelprop.comms
   old.oversized <- num.oversized
   
-  #if(length(num.oversized) == 0) {
-  #  return(labelprop.comms)
-  #}
+  if(length(num.oversized) == 0) {
+    size.communities <- table(labelprop.comms)
+    commnames <- unique(names(size.communities[size.communities > 1]))
+    return(list(names=commnames, membership=labelprop.comms))
+  }
   
   while(length(num.oversized) > 0) {
     louvain.comms <- clusterLouvain(net, num.oversized, old.comms)
@@ -337,7 +337,6 @@ cabernetCommunities <- function(net, dat.list, lnodes, seed) {
     old.oversized <- num.oversized
   }
   
-  louvain.comms <- labelprop.comms
   size.communities <- table(louvain.comms)
   commnames <- unique(names(size.communities[size.communities > 1]))
   
@@ -408,7 +407,6 @@ cabernetGlasso <- function(netlist, communities, dat.list, seednum, scale=F) {
     comm1.adjedges <- findAdjacentCommEdges(netlist, comm1genes, communities)
     
     adjcomms <- setdiff(unique(comm1.adjedges$comm1, comm1.adjedges$comm2), comm1.num)
-    adjcomms <- adjcomms[which(adjcomms > comm1.num)]
     
     if(length(adjcomms) == 0) {
       noadjcomms <- c(noadjcomms, comm1.num)
@@ -474,7 +472,7 @@ cleaningOutput <- function(input, netlist) {
   strsplit.ind <- seq(from=1, by=2, length.out = nrow(input))
   strsplit.ind2 <- seq(from=2, by=2, length.out = nrow(input))
   
-  net.edges <- data.table(input) %>% 
+  net.edges <- data.table(switched.W) %>% 
     mutate(n1cell = unlist(strsplit(node1, split="_"))[strsplit.ind]) %>%
     mutate(n2cell = unlist(strsplit(node2, split="_"))[strsplit.ind]) %>%
     mutate(ligand = unlist(strsplit(node1, split="_"))[strsplit.ind2]) %>%
@@ -560,8 +558,52 @@ cabernet <- function(cellmarkers, dat.list, seed, numgenes=2, cutoff=1) {
   
 }
 
-
-
+#' Making chord diagram for caberNET results
+#'
+#'
+#' @param  interactome Predicted interactome
+#' @param grid.col Optional: color option for cell type
+#' @return Chord Diagram highlighting proportion of cell-types in interactome
+#' @export
+#' 
+ChordPlot <- function(interactome, grid.col) {
+  chord.format <- mod.cab.filt %>%
+    mutate(node1 = paste0(n1cell, "_", ligand)) %>%
+    mutate(node2 = paste0(n2cell, "_", receptor))
+  
+  chord.sigmaxedges <- chord.format %>%
+    dplyr::select(node1, node2, n1cell, n2cell) %>%
+    unique()
+  
+  strsplit.ind <- seq(from=1, by=2, length.out = nrow(chord.sigmaxedges))
+  adeno.lr <- chord.sigmaxedges %>% 
+    mutate(celltypes = paste0(n1cell, "_", n2cell)) %>%
+    group_by(celltypes) %>%
+    mutate(count = n()) %>%
+    ungroup() 
+  
+  df2 <- adeno.lr %>%
+    dplyr::select(n1cell, n2cell, count) %>%
+    unique()
+  
+  # Colors for the different cell types
+  #grid.col <- 
+  lwd_mat = matrix(1, nrow = nrow(df2), ncol = ncol(df2))
+  
+  #tiff("adenochord.tiff", width = 5, height = 5, units = 'in', res = 600)
+  chordDiagram(df2, 
+               grid.col=grid.col, 
+               directional=1, 
+               direction.type = c("diffHeight", "arrows"), 
+               annotationTrack = c("grid"), link.lwd = lwd_mat) 
+  
+  legend("right", 
+         legend = names(grid.col), 
+         fill = grid.col,
+         border=NA,
+         bty="n")
+  # dev.off()
+}
 
 
 

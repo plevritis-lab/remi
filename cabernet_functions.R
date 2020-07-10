@@ -21,9 +21,10 @@ makePPINetwork <- function(data, filt.genes, pathgenes, c, ppi=g.biogrid) {
   #print(vcount(net))
   edgelist <- as_edgelist(net)
   
-  if(nrow(edgelist) < 2) {
-    print(paste0(c, " has no PPI edges"))
-    return(NA)
+  if(nrow(edgelist) < 5) {
+    print(paste0(c, " has less than 5 PPI edges"))
+    egraph <- make_empty_graph(n=0, directed=T)
+    return(egraph)
   } 
   
   # Calculating edge weights
@@ -145,7 +146,7 @@ calculateOversizedComms <- function(net, communities, dat) {
                                    names(communities[communities==i]))$numnodes)
   }
   names(deg.comm) <- unique(communities)
-  max_num <- max(ncol(dat), 15)
+  max_num <- max(ncol(dat), 10)
   oversized.comms <- which(deg.comm > max_num)
   return(names(oversized.comms))
 }
@@ -186,11 +187,6 @@ calculateCommGlasso <- function(S, x, netlist, lambda.max = 0.9, scale=F, additi
   
   n <- nrow(x)
   d <- ncol(x)
-  #if(scale==T) {
-  #  x <- scale(x) * sqrt((n - 1)/n)
-  #}
-  
-  #S <- cor(x)
   
   allLRpairs <- c(lr$combo1, lr$combo2)
   filtallLRpairs <- setdiff(allLRpairs, additional)
@@ -207,10 +203,6 @@ calculateCommGlasso <- function(S, x, netlist, lambda.max = 0.9, scale=F, additi
   
   pmat.one <- pmat.all %>%
     filter(AB %in% filtallLRpairs)
-  
-  #if(!(is.null(additional))) {
-  #  print(dim(pmat.one)) 
-  #}
   
   if(nrow(pmat.zero) == 0) {
     pmat.zero <- NULL
@@ -251,10 +243,6 @@ calculateCommGlasso <- function(S, x, netlist, lambda.max = 0.9, scale=F, additi
   W[,"numgenes"] <- net.vars$numnodes
   W[,"cor"] <- getUpperTri(cor(x, method="pearson"), round = TRUE)
   
-  #if(!(is.null(additional))) {
-  #  print(W)
-  ##}
-  #return(W)
   return(list(W=data.frame(W, stringsAsFactors = F), S=S))
 }
 
