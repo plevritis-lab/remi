@@ -1,0 +1,52 @@
+---
+title: "introduction"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{introduction}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup}
+#devtools::load_all()
+library(remi)
+```
+
+Reading in dataset: 
+To-Do: get rid of cell markers! 
+- create tutorial for Seurat object integration
+```{r}
+adeno.data <- read.csv("/Users/ayu1/Documents/U01_adeno_scaled.csv",
+                       row.names=1)
+cellmarkers <- c("CD45", "CD31", "CD10", "Ep")
+names(cellmarkers) <- c("I", "E", "F", "M")
+```
+ 
+Set up data for remi
+```{r}
+cellexp.list <- setupData(adeno.data, cellmarkers, 2, filter=T)
+remi.interactome <- remi(cellmarkers, cellexp.list)
+```
+
+Visualize interactome players 
+```{r}
+ChordPlot(remi.interactome)
+```
+
+Visualize community of interest using ggnet
+```{r}
+```
+
+Calculate significance for edge of interest
+```{r}
+```
+
+
+
+
+
+
+
+
+
+

@@ -1,148 +1,143 @@
 #' Making network function
-#' 
+#'
 #' Given the dataset and genes, make a protein-protein interaction network
 #' using BioGRID as a base network
-#' 
+#'
 #' @param data Gene expression data
 #' @param filt.genes Genes that are nodes in the network
 #' @param pathgenes List of KEGG pathway genes TO BE REMOVED
 #' @param c Name of cell type to label the genes in the network
 #' @return A network
-#' @export
-#' 
+#'
 makePPINetwork <- function(data, filt.genes, pathgenes, c, ppi=g.biogrid) {
   # Selecting pathway genes from BioGRID
   pathgenes <- intersect(paste0(c, "_", pathgenes), rownames(data))
-  V(ppi)$name <- paste0(c, "_", V(ppi)$name)
-  
-  overlap.genes <- intersect(setdiff(pathgenes, filt.genes), V(ppi)$name)
-  
+  igraph::V(ppi)$name <- paste0(c, "_", igraph::V(ppi)$name)
+
+  overlap.genes <- intersect(setdiff(pathgenes, filt.genes),
+                             igraph::V(ppi)$name)
+
   net <- igraph::induced_subgraph(ppi, vids=overlap.genes)
-  #print(vcount(net))
-  edgelist <- as_edgelist(net)
-  
+  edgelist <- igraph::as_edgelist(net)
+
   if(nrow(edgelist) < 5) {
     print(paste0(c, " has less than 5 PPI edges"))
-    egraph <- make_empty_graph(n=0, directed=T)
+    egraph <- igraph::make_empty_graph(n=0, directed=T)
     return(egraph)
-  } 
-  
+  }
+
   # Calculating edge weights
-  cor.edges <- cor(t(data[which(rownames(data) %in% V(net)$name),]), 
+  cor.edges <- cor(t(data[which(rownames(data) %in% igraph::V(net)$name),]),
                    method="pearson")
-  cor.weights <- rep(0, ecount(net))
-  
-  for(e in 1:ecount(net)) {
+  cor.weights <- rep(0, igraph::ecount(net))
+
+  for(e in 1:igraph::ecount(net)) {
     cor.weights[e] <- abs(cor.edges[edgelist[e,1], edgelist[e,2]])
   }
-  
-  E(net)$weight <- cor.weights
+
+  igraph::E(net)$weight <- cor.weights
   net
 }
 
 #' Clustering using label propagation
-#' 
+#'
 #' This is the initial clustering step in cabernet. The network is
 #' seeded with receptors that had a high eigenvector centrality
 #' measurement to produce clusters that reflect downstream signaling
 #' activity seen in the dataset.
-#' 
+#'
 #' @param net LR network
 #' @param clu Components in the network
 #' @param clu.labeled Communities that contain at least two EC receptors
 #' @param labelednodes List of EC receptors
 #' @return Communities identified using label propagation
-#' @export
-#' 
+#'
 findAdjacentCommEdges <- function(netlist, cgenes, comms) {
-  all_edges <- E(netlist$net)[inc(cgenes)]
-  all_edges_m <- data.table(get.edges(netlist$net, all_edges)) %>%
-    mutate(name1 = V(netlist$net)$name[V1]) %>%
-    mutate(name2 = V(netlist$net)$name[V2]) %>%
-    mutate(comm1 = comms$membership[name1]) %>%
-    mutate(comm2 = comms$membership[name2]) %>%
-    mutate(pairname = paste0(name1, "_", name2))
-  
+  all_edges <- igraph::E(netlist$net)[inc(cgenes)]
+  all_edges_m <- data.table::data.table(igraph::get.edges(netlist$net, all_edges)) %>%
+    dplyr::mutate(name1 = igraph::V(netlist$net)$name[V1]) %>%
+    dplyr::mutate(name2 = igraph::V(netlist$net)$name[V2]) %>%
+    dplyr::mutate(comm1 = comms$membership[name1]) %>%
+    dplyr::mutate(comm2 = comms$membership[name2]) %>%
+    dplyr::mutate(pairname = paste0(name1, "_", name2))
+
   return(all_edges_m)
 }
 
 #' Clustering using label propagation
-#' 
+#'
 #' This is the initial clustering step in cabernet. The network is
 #' seeded with receptors that had a high eigenvector centrality
 #' measurement to produce clusters that reflect downstream signaling
 #' activity seen in the dataset.
-#' 
+#'
 #' @param net LR network
 #' @param clu Components in the network
 #' @param clu.labeled Communities that contain at least two EC receptors
 #' @param labelednodes List of EC receptors
 #' @return Communities identified using label propagation
-#' @export
-#' 
+#'
 clusterLabelProp <- function(net, clu, clu.labeled, labelednodes) {
   final.comm <- clu[clu %in% setdiff(unique(clu), clu.labeled)]
-  
+
   for(cc in clu.labeled) {
-    clu.net <- induced_subgraph(net, names(clu[clu==cc]))
-    initclu <- seq(0, vcount(clu.net)-1)
-    names(initclu) <- V(clu.net)$name
+    clu.net <- igraph::induced_subgraph(net, names(clu[clu==cc]))
+    initclu <- seq(0, igraph::vcount(clu.net)-1)
+    names(initclu) <- igraph::V(clu.net)$name
     initclu[-which(names(initclu) %in% labelednodes)] <- -1
-    
-    fixclu <- rep(FALSE, vcount(clu.net))
+
+    fixclu <- rep(FALSE, igraph::vcount(clu.net))
     fixclu[names(initclu) %in% labelednodes] <- TRUE
-    clu.comm <- membership(cluster_label_prop(clu.net, 
+    clu.comm <- igraph::membership(igraph::cluster_label_prop(clu.net,
                                               fixed=fixclu,
                                               initial=initclu))
-    
+
     if(length(final.comm) != 0) {
       final.comm <- c(final.comm, clu.comm+max(final.comm))
     } else {
       final.comm <- clu.comm
     }
   }
-  
+
   return(final.comm)
 }
 
 #' Clustering using Louvain
-#' 
-#' The large communities identified by label propagation are broken down 
+#'
+#' The large communities identified by label propagation are broken down
 #' into even smaller communities to ensure the degree of the networks
 #' reflect the size of the dataset to maximize significance.
-#' 
+#'
 #' @param net LR network
 #' @param commnums List of communities that had a degree larger than sample size
 #' @param communities List of all communities in LR network
 #' @return Clusters identified using louvain combined with all communities
-#' @export
-#' 
+#'
 clusterLouvain <- function(net, commnums, communities) {
   final.comms <- communities[-which(communities %in% commnums)]
   for(cc in commnums) {
-    comm.net <- induced_subgraph(net,names(communities[communities==cc]))
-    louvain.comms <- membership(cluster_louvain(comm.net))
+    comm.net <- igraph::induced_subgraph(net,names(communities[communities==cc]))
+    louvain.comms <- igraph::membership(igraph::cluster_louvain(comm.net))
     final.comms <- c(final.comms, louvain.comms+max(final.comms))
   }
   return(final.comms)
 }
 
 #' Calculating the degree of each community in a network
-#' 
+#'
 #' Used to assess significance of the network relative to the
 #' sample size of the dataset
-#' 
+#'
 #' @param net LR network
 #' @param communites Communities of interest
 #' @param dat Dataset of one cell type
 #' @return List of maximum degree in each community
-#' @export
-#' 
+#'
 calculateOversizedComms <- function(net, communities, dat) {
   deg.comm <- c()
   for(i in unique(communities)){
-    deg.comm <- c(deg.comm, 
-                  calculateNetVars(net, 
+    deg.comm <- c(deg.comm,
+                  calculateNetVars(net,
                                    names(communities[communities==i]))$numnodes)
   }
   names(deg.comm) <- unique(communities)
@@ -152,89 +147,87 @@ calculateOversizedComms <- function(net, communities, dat) {
 }
 
 #' Calculating the degree of each community in a network
-#' 
+#'
 #' Used to assess significance of the network relative to the
 #' sample size of the dataset
-#' 
+#'
 #' @param net LR network
 #' @param communites Communities of interest
 #' @param dat Dataset of one cell type
 #' @return List of maximum degree in each community
-#' @export
-#' 
+#'
 calculateNetVars<- function(net, genes) {
-  comm.net <- induced_subgraph(net, genes)
+  comm.net <- igraph::induced_subgraph(net, genes)
   degree <- max(igraph::degree(comm.net))
-  numedges <- ecount(comm.net)
-  numnodes <- vcount(comm.net)
+  numedges <- igraph::ecount(comm.net)
+  numnodes <- igraph::vcount(comm.net)
   return(list(deg=degree, numedges=numedges, numnodes=numnodes))
 }
 
 #' Calculating the degree of each community in a network
-#' 
+#'
 #' Used to assess significance of the network relative to the
 #' sample size of the dataset
-#' 
+#'
 #' @param net LR network
 #' @param communites Communities of interest
 #' @param dat Dataset of one cell type
 #' @return List of maximum degree in each community
-#' @export
-#' 
+#'
 calculateCommGlasso <- function(S, x, netlist, lambda.max = 0.9, scale=F, additional=NULL) {
   net <- netlist$net
   lr <- netlist$mat
-  
+
   n <- nrow(x)
   d <- ncol(x)
-  
+
   allLRpairs <- c(lr$combo1, lr$combo2)
   filtallLRpairs <- setdiff(allLRpairs, additional)
-  
-  pmat.all <- data.table(t(combn(seq(1,ncol(x)),2))) %>%
-    mutate(A = colnames(x)[V1]) %>%
-    mutate(B = colnames(x)[V2]) %>%
-    mutate(AB = paste0(A, "_", B)) 
-  
+
+  pmat.all <- data.table::data.table(t(combn(seq(1,ncol(x)),2))) %>%
+    dplyr::mutate(A = colnames(x)[V1]) %>%
+    dplyr::mutate(B = colnames(x)[V2]) %>%
+    dplyr::mutate(AB = paste0(A, "_", B))
+
   pmat.zero <- pmat.all %>%
-    filter(!(AB %in% filtallLRpairs)) 
-  
+    dplyr::filter(!(AB %in% filtallLRpairs))
+
   pmat.zero <- as.matrix(pmat.zero %>% dplyr::select(V1, V2))
-  
+
   pmat.one <- pmat.all %>%
-    filter(AB %in% filtallLRpairs)
-  
+    dplyr::filter(AB %in% filtallLRpairs)
+
   if(nrow(pmat.zero) == 0) {
     pmat.zero <- NULL
   }
-  
+
   bic <- c()
   lambda.min <- 0.01
   lambdas = exp(seq(log(lambda.min), log(lambda.max), length = 20))
   for(l in lambdas) {
-    res <- glasso(S, l, 
-                  zero = pmat.zero, 
+    res <- glasso::glasso(S, l,
+                  zero = pmat.zero,
                   thr=1e-08)
     bic <- c(bic, EBIC(S, res$wi, n, 0, countDiagonal = F))
   }
-  
+
   # Pick optimal lambda
   opt.lambda <- lambdas[which.min(bic)]
-  
-  e <- glasso(S, opt.lambda, 
-              zero=pmat.zero, 
+
+  e <- glasso::glasso(S, opt.lambda,
+              zero=pmat.zero,
               thr=1e-08)
-  
-  pred.edges <- wi2net(e$wi)
-  
+
+  pred.edges <- qgraph::wi2net(e$wi)
+
   net.vars <- calculateNetVars(net, colnames(x))
-  
+
   # Output
   ind <- which( upper.tri(pred.edges, diag=F) , arr.ind = TRUE )
   W <- matrix(0, nrow(ind), 6)
-  colnames(W) <- c("node1", "node2", 
-                   "weight", 
-                   "cor", "deg", 
+  colnames(W) <- c("node1", "node2",
+                   "weight",
+                   "cor", "deg",
                    "numgenes")
   W[,"node1"] <- colnames(x)[ind[,1]]
   W[,"node2"] <- colnames(x)[ind[,2]]
@@ -242,30 +235,28 @@ calculateCommGlasso <- function(S, x, netlist, lambda.max = 0.9, scale=F, additi
   W[,"deg"] <- net.vars$deg
   W[,"numgenes"] <- net.vars$numnodes
   W[,"cor"] <- getUpperTri(cor(x, method="pearson"), round = TRUE)
-  
+
   return(list(W=data.frame(W, stringsAsFactors = F), S=S))
 }
 
 #' Log Likelihood
-#' 
+#'
 #' @param data Community gene expression matrix
 #' @param theta Parameter for log-likelihood calculation
 #' @return A network
-#' @export
-#' 
+#'
 loglik_ave <- function(data, theta){
   return(-(log(det(theta)) - sum(diag(var(data) %*% theta))))
 }
 
 #' EBIC calculation
-#' 
-#' @param S Covariance matrix 
+#'
+#' @param S Covariance matrix
 #' @param K Inverse covariance matrix
 #' @param n Sample number
 #' @return EBIC number
-#' @export
-#' 
-EBIC <- function (S, K, n, gamma = 0.5, E, countDiagonal = FALSE) 
+#'
+EBIC <- function (S, K, n, gamma = 0.5, E, countDiagonal = FALSE)
 {
   L <- logGaus(S, K, n)
   if (missing(E)) {
@@ -276,27 +267,25 @@ EBIC <- function (S, K, n, gamma = 0.5, E, countDiagonal = FALSE)
 }
 
 #' Calculating log Gaussian
-#' 
+#'
 #' @param S Covariance matrix
 #' @param K Inverse covariance matrix
 #' @param n Sample size
 #' @return Log Gaussian calculation
-#' @export
-#' 
-logGaus <- function (S, K, n) 
+#'
+logGaus <- function (S, K, n)
 {
   KS = K %*% S
   tr = function(A) sum(diag(A))
   return(n/2 * (log(det(K)) - tr(KS)))
 }
 
-#' Given graphical lasso matrix form output, extract edges by 
+#' Given graphical lasso matrix form output, extract edges by
 #' looking at rows vs. column elements
-#' 
+#'
 #' @param fit glasso matrix output
 #' @return List form of predicted edges
-#' @export
-#' 
+#'
 getUpperTri<- function(fit, round=TRUE) {
   fit.net <- sign(fit)
   fit.ind <- which(upper.tri(fit.net, diag=F) , arr.ind=T)
