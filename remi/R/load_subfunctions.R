@@ -9,9 +9,10 @@
 #' @param c Name of cell type to label the genes in the network
 #' @return A network
 #'
-makePPINetwork <- function(data, filt.genes, pathgenes, c, ppi=g.biogrid) {
+makePPINetwork <- function(data, filt.genes, pathgenes, c, lrmat, ppi=g.biogrid) {
   # Selecting pathway genes from BioGRID
   pathgenes <- intersect(paste0(c, "_", pathgenes), rownames(data))
+  pathgenes <- c(pathgenes, lrmat$R)
   igraph::V(ppi)$name <- paste0(c, "_", igraph::V(ppi)$name)
 
   overlap.genes <- intersect(setdiff(pathgenes, filt.genes),
@@ -141,7 +142,7 @@ calculateOversizedComms <- function(net, communities, dat) {
                                    names(communities[communities==i]))$numnodes)
   }
   names(deg.comm) <- unique(communities)
-  max_num <- max(ncol(dat), 10)
+  max_num <- max(ncol(dat), 5)
   oversized.comms <- which(deg.comm > max_num)
   return(names(oversized.comms))
 }
@@ -174,12 +175,16 @@ calculateNetVars<- function(net, genes) {
 #' @param dat Dataset of one cell type
 #' @return List of maximum degree in each community
 #'
-calculateCommGlasso <- function(S, x, netlist, lambda.max = 0.9, scale=F, additional=NULL) {
+calculateCommGlasso <- function(S, x, netlist, lambda.max = 0.9,
+                                lambda = NULL,
+                                scale=F,
+                                additional=NULL, verbose=T) {
   net <- netlist$net
   lr <- netlist$mat
 
   n <- nrow(x)
   d <- ncol(x)
+  if(scale == T) x <- scale(x)
 
   allLRpairs <- c(lr$combo1, lr$combo2)
   filtallLRpairs <- setdiff(allLRpairs, additional)
@@ -190,51 +195,53 @@ calculateCommGlasso <- function(S, x, netlist, lambda.max = 0.9, scale=F, additi
     dplyr::mutate(AB = paste0(A, "_", B))
 
   pmat.zero <- pmat.all %>%
-    dplyr::filter(!(AB %in% filtallLRpairs))
-
-  pmat.zero <- as.matrix(pmat.zero %>% dplyr::select(V1, V2))
-
-  pmat.one <- pmat.all %>%
-    dplyr::filter(AB %in% filtallLRpairs)
+    dplyr::filter(!(AB %in% filtallLRpairs)) %>%
+    dplyr::select(V1, V2) %>%
+    as.matrix()
 
   if(nrow(pmat.zero) == 0) {
     pmat.zero <- NULL
   }
 
-  bic <- c()
-  lambda.min <- 0.01
-  lambdas = exp(seq(log(lambda.min), log(lambda.max), length = 20))
-  for(l in lambdas) {
-    res <- glasso::glasso(S, l,
-                  zero = pmat.zero,
-                  thr=1e-08)
-    bic <- c(bic, EBIC(S, res$wi, n, 0, countDiagonal = F))
+  if(is.null(lambda)) {
+    bic <- c()
+    lambda.min <- 0.1
+    lambdas = exp(seq(log(lambda.min), log(lambda.max), length = 20))
+    for(l in lambdas) {
+      res <- glasso::glasso(S,
+                            l,
+                            zero = pmat.zero,
+                            approx=F)
+
+      bic <- c(bic, EBIC(S, res$wi, gamma=0, n))
+    }
+
+    # Pick optimal lambda
+    opt.lambda <- lambdas[which.min(bic)]
+  } else {
+    opt.lambda <- as.numeric(lambda)
   }
 
-  # Pick optimal lambda
-  opt.lambda <- lambdas[which.min(bic)]
-
   e <- glasso::glasso(S, opt.lambda,
-              zero=pmat.zero,
-              thr=1e-08)
+                      zero=pmat.zero,
+                      approx=F)
 
   pred.edges <- qgraph::wi2net(e$wi)
+  #pred.edges <- e$wi
 
   net.vars <- calculateNetVars(net, colnames(x))
 
   # Output
   ind <- which( upper.tri(pred.edges, diag=F) , arr.ind = TRUE )
-  W <- matrix(0, nrow(ind), 6)
-  colnames(W) <- c("node1", "node2",
-                   "weight",
-                   "cor", "deg",
-                   "numgenes")
+  W <- matrix(0, nrow(ind), 7)
+  colnames(W) <- c("node1", "node2", "weight", "cor", "deg", "numgenes", "lambda")
   W[,"node1"] <- colnames(x)[ind[,1]]
   W[,"node2"] <- colnames(x)[ind[,2]]
   W[,"weight"] <- getUpperTri(pred.edges, round = TRUE)
   W[,"deg"] <- net.vars$deg
   W[,"numgenes"] <- net.vars$numnodes
   W[,"cor"] <- getUpperTri(cor(x, method="pearson"), round = TRUE)
+  W[,"lambda"] <- opt.lambda
 
   return(list(W=data.frame(W, stringsAsFactors = F), S=S))
 }
@@ -256,7 +263,7 @@ loglik_ave <- function(data, theta){
 #' @param n Sample number
 #' @return EBIC number
 #'
-EBIC <- function (S, K, n, gamma = 0.5, E, countDiagonal = FALSE)
+EBIC <- function (S, K, n, E, gamma = 0, countDiagonal = FALSE)
 {
   L <- logGaus(S, K, n)
   if (missing(E)) {
@@ -295,3 +302,70 @@ getUpperTri<- function(fit, round=TRUE) {
     return(fit[fit.ind])
   }
 }
+
+#' Generate null density given covariance matrix
+#'
+#' @param r density
+#' @param S covariance matrix
+#' @param i index for ligand
+#' @param j index for receptor
+#' @param n sample size
+#' @return Null density
+#'
+null_density = function(r, S, i, j, n) {
+
+  p = nrow(S)
+  S_0 = 1 * S
+  S_0[i,j] = 0
+  S_0[j,i] = 0
+  Theta_0 = solve(S_0)
+
+  a = Theta_0[i,j]
+  b = Theta_0[i,i]
+  c = Theta_0[j,j]
+  d = sqrt(S[i,i] * S[j,j])
+
+  V = ((1 + r * d * a)^2 - r^2 * d^2 * b * c)
+  V[V<0] = 0
+
+  return(V^((n-p-2)/2))
+}
+
+#' Calculates p-value for a community
+#'
+#' @param R_ correlation matrix
+#' @param S_ covariance matrix
+#' @param D_ list of correlation perturbations and number of times graphical lasso predicted an edge to be present or not
+#' @param i_ index for ligand
+#' @param j_ index for receptor
+#' @param n sample size
+#' @param p number of features in community
+#' @return p-value
+#'
+calculatePvalue <- function(R_, S_, D_, i_, j_, n, p) {
+  if(p > n) {cat("More features in community than sample size. Can not calculate p-values\n")}
+
+  clf_ = tree::tree(factor(Y) ~ T, data=D_)
+  null_sample = rnorm(10000, sd=2 / sqrt(n-p))
+  null_sample = dnorm(null_sample, sd=2/sqrt(n-p))
+
+  weights_ = (as.numeric(predict(clf_, newdata=data.frame(T=null_sample),
+                                        type='class')) - 1)
+
+  weights_ = weights_ * (null_density(null_sample, S_, n=n, i=i_, j=j_)
+                         / dnorm(null_sample, sd=2 / sqrt(n-p)))
+
+  onesided_pvalue = (mean(weights_ * (null_sample > R_[i_, j_]))  + 1)/(mean(weights_)+ 1)
+
+  twosided_pvalue = 2 * min(onesided_pvalue, 1 - onesided_pvalue)
+
+  return(list(p=twosided_pvalue, w=weights_, w_n=(weights_ * (null_sample > R_[i_, j_]))))
+}
+
+
+
+
+
+
+
+

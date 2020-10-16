@@ -11,13 +11,12 @@
 #' @export
 #'
 setupData <- function(dat, cellmarkers, filter=T, var = 3) {
-  dplyr::filtered.cellexps <- list()
-  notdplyr::filtered.cellexps <- list()
+  filtered.cellexps <- list()
+  notfiltered.cellexps <- list()
 
   colsvec <- c()
-  for(i in 1:length(cellmarkers)) {
-    curr.name <- names(cellmarkers)[i]
-    celltype.filt <- dat[,grep(cellmarkers[i], colnames(dat))]
+  for(curr.name in cellmarkers) {
+    celltype.filt <- dat[,grep(curr.name, colnames(dat))]
 
     dat.cols <- unique(unlist(lapply(colnames(celltype.filt),
                                      function(x) {strsplit(x, "_")[[1]][1]})))
@@ -37,32 +36,32 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
     # Finalized cleaned data matrix
     cleaned.filt <- celltype.filt[-which(rownames(celltype.filt) %in% removegenes),]
 
-    dplyr::filtered.cellexps[[curr.name]] <- cleaned.filt
-    notdplyr::filtered.cellexps[[curr.name]] <- celltype.filt
+    filtered.cellexps[[curr.name]] <- cleaned.filt
+    notfiltered.cellexps[[curr.name]] <- celltype.filt
   }
 
   allpresent.cols <- names(which(table(colsvec) == length(cellmarkers)))
 
-  #dplyr::filtering non-dplyr::filtered data
-  for(c in names(notdplyr::filtered.cellexps)) {
-    allpresent.filt.data <- notdplyr::filtered.cellexps[[c]][,allpresent.cols]
+  #filtering non-filtered data
+  for(c in names(notfiltered.cellexps)) {
+    allpresent.filt.data <- notfiltered.cellexps[[c]][,allpresent.cols]
     duplicate.cols <- which(apply(allpresent.filt.data, 1,
                                   function(x) length(unique(x))==1) == TRUE)
     if(length(duplicate.cols) > 0) {
-      notdplyr::filtered.cellexps[[c]] <- allpresent.filt.data[-duplicate.cols,]
+      notfiltered.cellexps[[c]] <- allpresent.filt.data[-duplicate.cols,]
     } else {
-      notdplyr::filtered.cellexps[[c]] <- allpresent.filt.data
+      notfiltered.cellexps[[c]] <- allpresent.filt.data
     }
   }
 
-  for(c in names(dplyr::filtered.cellexps)) {
-    allpresent.filt.data <- dplyr::filtered.cellexps[[c]][,allpresent.cols]
+  for(c in names(filtered.cellexps)) {
+    allpresent.filt.data <- filtered.cellexps[[c]][,allpresent.cols]
     duplicate.cols <- which(apply(allpresent.filt.data, 1,
                                   function(x) length(unique(x))==1) == TRUE)
     if(length(duplicate.cols) > 0) {
-      dplyr::filtered.cellexps[[c]] <- allpresent.filt.data[-duplicate.cols,]
+      filtered.cellexps[[c]] <- allpresent.filt.data[-duplicate.cols,]
     } else {
-      dplyr::filtered.cellexps[[c]] <- allpresent.filt.data
+      filtered.cellexps[[c]] <- allpresent.filt.data
     }
   }
 
@@ -93,9 +92,13 @@ expandLRpairs <- function(lr.table, datlist, celltypes) {
   all.genes <- as.vector(unlist(lapply(datlist, function(x) {rownames(x)})))
 
   allcellexp <- datlist[[names(datlist)[1]]]
-  for(c in names(datlist)[2:length(datlist)]) {
-    allcellexp <- rbind(allcellexp, datlist[[c]])
+  if(length(names(datlist)) > 1) {
+    for(c in names(datlist)[2:length(datlist)]) {
+      allcellexp <- rbind(allcellexp, datlist[[c]])
+    }
   }
+
+  allcellexp <- t(scale(t(allcellexp)))
 
   allcombolr <- expand.grid(all.ls, all.rs, stringsAsFactors=F)
   first.ind <- seq(from=1, by=2, length.out = nrow(allcombolr))
@@ -116,10 +119,10 @@ expandLRpairs <- function(lr.table, datlist, celltypes) {
     dplyr::filter(R %in% all.genes)
 
   if(nrow(lr.network.pairs) == 0) {
-    print("No ligand and receptor pairs in dataset. Try relaxing the gene expression cutoff dplyr::filter.")
+    cat("No ligand and receptor pairs in dataset. Try relaxing the gene expression cutoff\n")
   }
 
-  return(lr.network.pairs)
+  return(list(lr.network.pairs=lr.network.pairs, expanddata = allcellexp))
 }
 
 #' Generating cell type-specific ligand receptor pair network
@@ -134,20 +137,21 @@ expandLRpairs <- function(lr.table, datlist, celltypes) {
 #' ligand receptor pairs across all cell types
 #' @export
 #'
-generateLRnet <- function(lr.table, celltypes, datlist, cor=T) {
+generateLRnet <- function(lr.table, celltypes, datlist, cor=T, verbose=T) {
 
-  cat("\nStep 1/3: Expanding LR pairs across all cell types\n")
+  if(verbose == T) cat("\nStep 1/3: Expanding LR pairs across all cell types\n")
   lr.network.pairs <- expandLRpairs(lr.table, datlist, celltypes)
 
-  cat("Step 2/3: Calculating edge weight\n")
-  pairwise.cor <- calculateCor(lr.network.pairs, datlist)
+  if(verbose == T) cat("Step 2/3: Calculating edge weight\n")
+  pairwise.cor <- calculateCor(lr.network.pairs)
 
-  cat("Step 3/3: Creating graph object\n")
-  lr.network <- igraph::graph_from_edgelist(as.matrix(lr.network.pairs[,c(1,2)]),
+  if(verbose == T) cat("Step 3/3: Creating graph object\n")
+  lr.network <- igraph::graph_from_edgelist(as.matrix(lr.network.pairs$lr.network.pairs[,c(1,2)]),
                                     directed=F)
-  igraph::E(lr.network)$weight <- abs(as.numeric(paste0(pairwise.cor$cor)))
+  igraph::E(lr.network)$weight <- abs(as.numeric(paste0(pairwise.cor$pairwiseLR$cor)))
 
-  return(list(net=lr.network, mat=lr.network.pairs))
+  return(list(net=lr.network, mat=lr.network.pairs$lr.network.pairs,
+              pairwisecor=pairwise.cor, expanddata=lr.network.pairs$expanddata))
 }
 
 #' calculateCor - calculating pairwise correlation for all the LR pairs
@@ -156,36 +160,40 @@ generateLRnet <- function(lr.table, celltypes, datlist, cor=T) {
 #' Pearson correlation of all ligand receptor pairs.
 #'
 #' @param  lr.table List of cell type-specific LR pairs
-#' @param dat.list List of gene expression for each cell type
 #' @return A table of correlations for each LR pair
 #' @export
-calculateCor <- function(lr.table, dat.list) {
+calculateCor <- function(lr.obj, randomize=F, l.chosen=NULL, r.chosen=NULL, T_star=0) {
 
-  allcellexp <- dat.list[[names(dat.list)[1]]]
-  for(c in names(dat.list)[2:length(dat.list)]) {
-    allcellexp <- rbind(allcellexp, dat.list[[c]])
-  }
+  allcellexp <- lr.obj$expanddata
+  lr.table <- lr.obj$lr.network.pairs
 
   lr.genes <- unique(c(lr.table$L, lr.table$R))
-  lr.allcellexp <- allcellexp[lr.genes,]
+  lr.allcellexp <- allcellexp[which(rownames(allcellexp) %in% lr.genes),]
 
   pairwise.lr <- matrix(NA, nrow=nrow(lr.table), ncol=3)
 
   lr.cor <- cor(t(lr.allcellexp))
 
+  if(randomize == T) {
+    lr.cor[l.chosen, r.chosen] <- T_star
+    lr.cor[r.chosen, l.chosen] <- T_star
+  }
+
   for(i in 1:nrow(lr.table)) {
     ligand <- lr.table$L[i]
     receptor <- lr.table$R[i]
-    cor.res <- lr.cor[ligand, receptor]
+    cor.res <- lr.cor[which(rownames(lr.cor) == ligand),
+                      which(colnames(lr.cor) == receptor)]
     pairwise.lr[i,3] <- cor.res
   }
+
   pairwise.lr[,1] <- lr.table$L
   pairwise.lr[,2] <- lr.table$R
   pairwise.lr <- data.frame(pairwise.lr)
   colnames(pairwise.lr) <- c("L", "R", "cor")
   pairwise.lr$cor <- as.numeric(paste0(pairwise.lr$cor))
 
-  return(pairwise.lr)
+  return(list(pairwiseLR=pairwise.lr, expanddata=allcellexp, lr.cor = lr.cor))
 }
 
 #' Calculating eigenvector centrality for each receptor given downstream
@@ -199,21 +207,25 @@ calculateCor <- function(lr.table, dat.list) {
 #' @return List of receptors with high scoring eigenvector centrality measurements
 #' @export
 #'
-pickECgenes <- function(lrnet, dat.list, pgenelist, numgenes, cutoff, ppi, seed=10) {
+pickECgenes <- function(lrnet, dat.list, pgenelist, numgenes, cutoff, ppi, seed=10, verbose=T) {
 
   lr.table <- lrnet$mat
+  allcellexp <- lrnet$expanddata
 
   set.seed(seed)
   pgenes <- unlist(pgenelist)
 
+  if(verbose == T) cat("Building downstream PPI networks\n")
   cell.nets <- list()
   for(c in names(dat.list)) {
-    receive.exp <- dat.list[[c]]
-    receive.net <- makePPINetwork(receive.exp, unique(lr.table$L), pgenes, c, ppi)
-    if(!is.na(receive.net[1])) {
-      cell.nets[[c]] <- receive.net
-    }
+    receive.exp <- t(scale(t(dat.list[[c]])))
+    receive.net <- makePPINetwork(receive.exp, unique(lr.table$L), pgenes, c, lr.table, ppi)
+    #if(!is.na(receive.net[1])) {
+    cell.nets[[c]] <- receive.net
+    #}
   }
+
+  if(verbose == T) cat("Calculating importance score\n")
 
   cell.ec.list <- list()
   cell.ec.all.list <- list()
@@ -223,8 +235,10 @@ pickECgenes <- function(lrnet, dat.list, pgenelist, numgenes, cutoff, ppi, seed=
     cell.ec.r <- cell.ec[which(names(cell.ec) %in% lr.table$R)]
     cell.ec.list[[c]] <- cell.ec.r
     cell.ec.all.list[[c]] <- cell.ec
-    all.ec <- c(all.ec, cell.ec.r)
+    all.ec <- c(all.ec, cell.ec)
   }
+
+  if(verbose == T) cat("Selecting important receptors\n")
 
   sig.top.r.path <- c()
   for(c in names(cell.nets)) {
@@ -235,14 +249,13 @@ pickECgenes <- function(lrnet, dat.list, pgenelist, numgenes, cutoff, ppi, seed=
 
       top.genes <- head(sort(cell.ec.list[[c]][singler.path], decreasing=T),
                         numgenes)
-      top.genes <- top.genes[top.genes > 0]
+      #top.genes <- top.genes[top.genes > 0]
       sig.top.r.path <- c(sig.top.r.path, top.genes)
     }
   }
 
-  allcellexp <- dat.list[[names(dat.list)[1]]]
-  for(c in names(dat.list)[2:length(dat.list)]) {
-    allcellexp <- rbind(allcellexp, dat.list[[c]])
+  if(length(sig.top.r.path) == 0) {
+    return(NULL)
   }
 
   sig.path.exp <- allcellexp[which(rownames(allcellexp) %in%
@@ -252,7 +265,7 @@ pickECgenes <- function(lrnet, dat.list, pgenelist, numgenes, cutoff, ppi, seed=
 
   return(list(eclist=sig.top.r.path[rownames(sig.path.high)],
               net=cell.nets,
-              allec = sig.top.r.path))
+              allec = all.ec))
 }
 
 #' cabernetCommunities
@@ -267,13 +280,12 @@ pickECgenes <- function(lrnet, dat.list, pgenelist, numgenes, cutoff, ppi, seed=
 #' @return Communities in LR network
 #' @export
 #'
-cabernetCommunities <- function(net, dat.list, lnodes, seed) {
+remifiedCommunities <- function(net, dat.list, lnodes, seed, verbose=T) {
   set.seed(seed)
   # Identifying what components have a labeled receptor
   clu <- igraph::membership(igraph::components(net))
 
   labeled.comm.all <- table(clu[names(lnodes)])
-
   labeled.comm.names <- names(labeled.comm.all[labeled.comm.all>1])
   labeled.comm.names <- names(labeled.comm.all)
 
@@ -300,21 +312,23 @@ cabernetCommunities <- function(net, dat.list, lnodes, seed) {
     return(list(names=commnames, membership=labelprop.comms))
   }
 
-  while(length(num.oversized) > 0) {
+  #while(length(num.oversized) > 0) {
     louvain.comms <- clusterLouvain(net, num.oversized, old.comms)
     num.oversized <- calculateOversizedComms(net, louvain.comms, dat.list[[1]])
 
-    if(length(setdiff(num.oversized, old.oversized)) == 0) {
-      break
-    }
+    return(louvain.comms)
+
+  #  if(length(setdiff(num.oversized, old.oversized)) == 0) {
+  #    break
+  #  }
     old.comms <- louvain.comms
     old.oversized <- num.oversized
-  }
+  #}
 
   size.communities <- table(louvain.comms)
   commnames <- unique(names(size.communities[size.communities > 1]))
 
-  print(paste0(length(commnames), " communities identified"))
+  if(verbose == T) cat(paste0(length(commnames), " communities identified\n"))
 
   return(list(names=commnames, membership=louvain.comms))
 }
@@ -328,18 +342,15 @@ cabernetCommunities <- function(net, dat.list, lnodes, seed) {
 #' @return List of edges remaining in LR network
 #' @export
 #'
-cabernetGlasso <- function(netlist, communities, dat.list, seednum, scale=F) {
+remifiedGlasso <- function(netlist, communities, dat.list, seednum, lambda, scale=F) {
   set.seed(seednum)
   predicted.edges <- list()
 
-  allcellexp <- dat.list[[names(dat.list)[1]]]
-  for(c in names(dat.list)[2:length(dat.list)]) {
-    allcellexp <- rbind(allcellexp, dat.list[[c]])
-  }
+  allcellexp <- netlist$expanddata
 
-  gedges_w <- matrix("", nrow=0, ncol=8)
+  gedges_w <- matrix("", nrow=0, ncol=9)
   colnames(gedges_w) <- c("node1", "node2", "weight", "cor",
-                          "commnum", "commsize", "deg", "numgenes")
+                          "commnum", "commsize", "deg", "numgenes", "lambda")
 
   cat("Removing conditionally independent edges within communities\n")
   # Graphical Lasso within edges
@@ -353,12 +364,12 @@ cabernetGlasso <- function(netlist, communities, dat.list, seednum, scale=F) {
     lr.mat <- t(allcellexp[which(rownames(allcellexp) %in% commgenes),])
     lr.comm.net <- igraph::induced_subgraph(netlist$net, colnames(lr.mat))
 
-    W <- calculateCommGlasso(cor(lr.mat), lr.mat, netlist, lambda.max=0.9, scale=scale)
+    W <- calculateCommGlasso(cor(lr.mat), lr.mat, netlist, lambda.max=0.9, lambda=lambda, scale=scale)
 
     lr.W <- data.table::data.table(W$W) %>%
       dplyr::mutate(commnum = communitynum) %>%
       dplyr::mutate(commsize = length(commgenes)) %>%
-      dplyr::select(node1, node2, weight, cor, commnum, commsize, deg, numgenes)
+      dplyr::select(node1, node2, weight, cor, commnum, commsize, deg, numgenes, lambda)
     gedges_w <- rbind(gedges_w, lr.W)
 
     pbar$pause(0.01)$tick()$print()
@@ -406,12 +417,12 @@ cabernetGlasso <- function(netlist, communities, dat.list, seednum, scale=F) {
         if(length(betweengenes) > 2) {
 
           lr.mat <- t(allcellexp[which(rownames(allcellexp) %in% betweengenes),])
-          W <- calculateCommGlasso(cor(lr.mat), lr.mat, netlist, scale=scale, additional=combo)$W
+          W <- calculateCommGlasso(cor(lr.mat), lr.mat, netlist, lambda=lambda, scale=scale, additional=combo)$W
           betweenlr.W <- data.table::data.table(W) %>%
             dplyr::mutate(commnum = paste0(comm1.num, "_", comm2.num)) %>%
             dplyr::mutate(commsize = length(betweengenes)) %>%
             dplyr::select(node1, node2, weight, cor, commnum,
-                          commsize, deg, numgenes)
+                          commsize, deg, numgenes, lambda)
 
           gedges_w <- rbind(gedges_w, betweenlr.W)
 
@@ -430,12 +441,12 @@ cabernetGlasso <- function(netlist, communities, dat.list, seednum, scale=F) {
 #' on the communites in the network to predict significant ligand
 #' receptor interactions in the dataset of interest
 #'
-#' @param  input Glasso output
-#' @param netlist Ligand receptor network
+#' @param  obj REMI object
 #' @return Cleaned up list of LR pairs with metadata displayed in columns
 #' @export
 #'
 cleaningOutput <- function(input, netlist) {
+
   # Swapping LR pairs if they are in the order of RL
   switched.W <- input
   switch.inds <- which(input$node1 %in% netlist$mat$R)
@@ -452,7 +463,7 @@ cleaningOutput <- function(input, netlist) {
     dplyr::mutate(ligand = unlist(strsplit(node1, split="_"))[strsplit.ind2]) %>%
     dplyr::mutate(receptor = unlist(strsplit(node2, split="_"))[strsplit.ind2]) %>%
     dplyr::select(node1, node2, ligand, receptor, n1cell, n2cell,
-                  weight, cor, commsize, commnum, deg, numgenes) %>%
+                  weight, cor, commsize, commnum, deg, numgenes, lambda) %>%
     dplyr::mutate(pairname = paste0(node1, "_", node2)) %>%
     dplyr::filter(pairname %in% netlist$mat$combo1) %>%
     dplyr::group_by(node1, node2) %>%
@@ -461,7 +472,10 @@ cleaningOutput <- function(input, netlist) {
     dplyr::mutate(n = dplyr::n()) %>%
     dplyr::ungroup()
 
-  return(net.edges)
+  filtered.net.edges <- net.edges %>%
+    dplyr::filter(abs(as.numeric(weight)) > 0)
+
+  return(list(net.edges=net.edges, filtered.net.edges=filtered.net.edges))
 }
 
 
@@ -478,12 +492,12 @@ cleaningOutput <- function(input, netlist) {
 #' @return List of cabernet predictions
 #' @export
 #'
-remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1) {
+remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1, lambda=NULL) {
 
   # Creating LR network
   cat("Building LR network\n")
-  netlist <- generateLRnet(curr.lr.filt, names(cellmarkers),
-                          dat.list$filtered, pathway.genes)
+  netlist <- generateLRnet(curr.lr.filt, cellmarkers,
+                           dat.list$filtered, pathway.genes)
 
   #Identify influential receptors
   cat("Identifying influential receptors\n")
@@ -497,25 +511,35 @@ remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1) {
 
   # Cluster
   cat("Detecting communities")
-  commdetect.output <- cabernetCommunities(netlist$net, dat.list$filtered, labelednodes$eclist, seed)
+  commdetect.output <- remifiedCommunities(netlist$net, dat.list$filtered,
+                                           labelednodes$eclist, seed)
+
+  return(commdetect.output)
 
   # Graphical Lasso
   cat("\n Estimating activated LR pairs \n")
-  glasso.output <- cabernetGlasso(netlist, commdetect.output, dat.list$filtered, seed)
+  glasso.output <- remifiedGlasso(netlist, commdetect.output, dat.list$filtered, seed, lambda, scale=F)
 
   predicted.edges <- cleaningOutput(glasso.output, netlist)
 
-  numLRs <- length(unique(predicted.edges$node1, predicted.edges$node2))
+  numLRs <- length(unique(predicted.edges$filtered.net.edges$node1, predicted.edges$filtered.net.edges$node2))
 
-  if(nrow(predicted.edges) == 0) {
+  if(nrow(predicted.edges$filtered.net.edges) == 0) {
     cat("\nNo interactome found\n")
-    return(predicted.edges)
+    return(NULL)
   }
 
-  return(list(lrnet=netlist, ir=labelednodes,
-              interactome=predicted.edges,
-              communities=commdetect.output))
+  params <- list()
+  params[["numgenes"]] <- numgenes
+  params[["cutoff"]] <- cutoff
+  params[["seed"]] <- seed
 
+  return(list(lrnet=netlist,
+              ir=labelednodes,
+              unfilteredinteractome=predicted.edges$net.edges,
+              interactome=predicted.edges$filtered.net.edges,
+              communities=commdetect.output,
+              params=params))
 }
 
 #' Making chord diagram for caberNET results
@@ -526,7 +550,7 @@ remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1) {
 #' @return Chord Diagram highlighting proportion of cell-types in interactome
 #' @export
 #'
-ChordPlot <- function(interactome, grid.col) {
+REMIPlot <- function(interactome, type="Sankey", grid.col=NULL) {
   chord.format <- interactome$interactome %>%
     dplyr::mutate(node1 = paste0(n1cell, "_", ligand)) %>%
     dplyr::mutate(node2 = paste0(n2cell, "_", receptor))
@@ -547,22 +571,206 @@ ChordPlot <- function(interactome, grid.col) {
     unique()
 
   # Colors for the different cell types
-  # grid.col <-
   lwd_mat = matrix(1, nrow = nrow(df2), ncol = ncol(df2))
 
-  circlize::chordDiagram(df2,
-               #grid.col=grid.col,
-               directional=1,
-               direction.type = c("diffHeight", "arrows"),
-               annotationTrack = c("grid"), link.lwd = lwd_mat)
+  if(type == "chord") {
+    circlize::chordDiagram(df2,
+                 grid.col=grid.col,
+                 directional=1,
+                 direction.type = c("diffHeight", "arrows"),
+                 annotationTrack = c("grid"), link.lwd = lwd_mat)
 
-  legend("right",
-         legend = names(grid.col),
-         fill = grid.col,
-         border=NA,
-         bty="n")
+    legend("right",
+           legend = names(grid.col),
+           fill = grid.col,
+           border=NA,
+           bty="n")
+  }
+
+  if(type == "sankey") {
+    links <- df2
+    colnames(links) <- c("source", "target", "value")
+    links$source <- paste0("Source_", links$source)
+    links$target <- paste0("Target_", links$target)
+    # From these flows we need to create a node data frame: it lists every entities involved in the flow
+    nodes <- data.frame(
+      name=unique(c(links$source, links$target))
+    )
+
+    # With networkD3, connection must be provided using id, not using real name like in the links dataframe.. So we need to reformat it.
+    links$IDsource <- match(links$source, nodes$name)-1
+    links$IDtarget <- match(links$target, nodes$name)-1
+
+    nodes$name <- gsub('Source_', '', nodes$name)
+    nodes$name <- gsub('Target_', '', nodes$name)
+
+    # Make the Network
+    my_color <- 'd3.scaleOrdinal().domain(["I", "E", "F", "M"]).range(["#195188", "#AC371F", "#BB6A23", "#00503C"])'
+
+    p <- sankeyNetwork(Links = links, Nodes = nodes,
+                       Source = "IDsource", Target = "IDtarget",
+                       Value = "value", NodeID = "name",
+                       sinksRight=FALSE,
+                       colourScale = my_color)
+
+    return(p)
+  }
 }
 
 
+#' Calculating p-value for a given edge in a community
+#'
+#'
+#' @param  obj REMI object
+#' @param l.chosen Ligand in edge
+#' @param r.chosen Receptor in edge
+#' @param comm.chosen Community that edge is present in
+#' @param iterNum = Number of permutations for p-value calculation
+#' @param seednum = Seed
+#' @param lambda = Manually setting lambda if of interest
+#' @return Chord Diagram highlighting proportion of cell-types in interactome
+#' @export
+#'
+calculateSignificance <- function(obj,
+                                  l.chosen, r.chosen,
+                                  comm.chosen,
+                                  iterNum = 1000, seednum=30,
+                                  lambda = NULL) {
 
+  # Setting Varibales
+  allcellexp <- obj$lrnet$expanddata
+  node1 <- obj$interactome$node1
+  node2 <- obj$interactome$node2
+  commnums <- obj$interactome$commnum
+  param <- obj$params
+  between <- FALSE
+
+  if(is.null(lambda)) {
+    opt.lambda <- obj$interactome %>%
+      dplyr::filter(commnum == comm.chosen) %>%
+      dplyr::select(lambda) %>%
+      pull() %>% unique()
+  } else {
+    opt.lambda <- lambda
+  }
+
+  if("_" %in% comm.chosen) {
+    between = TRUE
+  }
+
+  # Obtaining community genes
+  comm.num.index <- which(commnums == comm.chosen)
+
+  orig.comm.genes <- unique(c(node1[comm.num.index],
+                              node2[comm.num.index]))
+
+  cat("Number of genes in community\t", length(orig.comm.genes),"\n")
+
+  if(length(orig.comm.genes) > ncol(allcellexp)) {
+    cat("Can not calculate significance due to community size.\n")
+    return(NULL)
+  }
+
+  # Parameters for original community
+  community.mat <- t(allcellexp[which(rownames(allcellexp) %in% orig.comm.genes),])
+  R <- cor(community.mat)
+  S <- cov(community.mat)
+  l.ind <- which(colnames(R) == l.chosen)
+  r.ind <- which(colnames(R) == r.chosen)
+
+  if(length(l.ind) == 0) {cat("LR pair not in community")}
+
+  comm.change <- 0
+
+  cat("Calculating p-value\n")
+  pbar <- dplyr::progress_estimated(iterNum, min_time = 0)
+
+  pval.list <- c()
+  T.list <- c()
+  Y.list <- c()
+  for(i in 1:iterNum) {
+    set.seed(i*seednum)
+
+    T_star = 2 * runif(1) - 1 # a uniform value in [-1,1]
+
+    R_star_cor_df <- calculateCor(list(expanddata=allcellexp,
+                                       lr.network.pairs=adeno.remi$lrnet$mat),
+                                  randomize=T,
+                                  l.chosen=l.chosen,
+                                  r.chosen=r.chosen,
+                                  T_star=T_star)
+
+    boot.net <- graph_from_edgelist(as.matrix(R_star_cor_df$pairwiseLR[,c("L", "R")]), directed=F)
+    E(boot.net)$weight <- abs(as.numeric(R_star_cor_df$pairwiseLR[,"cor"]))
+
+    ec.nodes <- pickECgenes(list(net=boot.net,
+                                 mat=R_star_cor_df$pairwiseLR[,c("L", "R")],
+                                 expanddata=allcellexp),
+                            cellexp.list$filtered,
+                            pathway.genelist$genesets,
+                            numgenes = param$numgenes,
+                            cutoff = param$cutoff,
+                            ppi = g.biogrid,
+                            seed = param$seed,
+                            verbose = F)
+
+    commboot.output <- remifiedCommunities(boot.net,
+                                           cellexp.list$filtered,
+                                           ec.nodes$eclist,
+                                           param$seed,
+                                           verbose=F)
+
+    commnums.boot <- commboot.output$membership
+
+    l.boot.num <- commnums.boot[l.chosen]
+    r.boot.num <- commnums.boot[r.chosen]
+
+    if(between) {
+      if(l.boot.num == r.boot.num) {
+        T.list <- c(T.list, T_star)
+        Y.list <- c(Y.list, 0)
+        comm.change <- comm.change + 1
+        next
+      }
+
+      comm1genes <- names(commnums.boot)[which(commnums.boot == l.boot.num)]
+      comm2genes <- names(commnums.boot)[which(commnums.boot == r.boot.num)]
+      commgenes <- unique(c(comm1genes, comm2genes))
+
+      between.edges <- findAdjacentCommEdges(obj$lrnet, commgenes, commboot.output) %>%
+        filter((comm1 == l.boot.num & comm2 == r.boot.num) |
+                 (comm1 == r.boot.num & comm2 == l.boot.num)) %>%
+        filter(comm1 != comm2)
+
+      lr.boot.genes <- unique(c(between.edges$name1, between.edges$name2))
+    } else { lr.boot.genes <- names(commnums.boot[commnums.boot == l.boot.num]) }
+
+    comm.mat <- t(allcellexp[which(rownames(allcellexp) %in% lr.boot.genes),])
+    comm.cor <- R_star_cor_df$lr.cor[which(rownames(R_star_cor_df$lr.cor) %in% lr.boot.genes),
+                                     which(colnames(R_star_cor_df$lr.cor) %in% lr.boot.genes)]
+
+    g <- calculateCommGlasso(comm.cor, comm.mat, obj$lrnet, scale=T, lambda=opt.lambda)$W %>%
+      mutate(weight = if_else(abs(as.numeric(weight)) > 0, 1, 0))
+
+    node.ind <- which(g$node1 == l.chosen & g$node2 == r.chosen)
+    if(length(node.ind) == 0) {
+      node.ind <- which(g$node2 == l.chosen & g$node1 == r.chosen)
+    }
+
+    Y_star <- g$weight[node.ind]
+
+    T.list <- c(T.list, T_star)
+    Y.list <- c(Y.list, Y_star)
+
+    pbar$pause(0.01)$tick()$print()
+  }
+
+  D <- list(T=T.list, Y=Y.list)
+
+  print(table(D$Y))
+
+  pval <- calculatePvalue(R, S, D, i_=l.ind, j_=r.ind,
+                          n=ncol(allcellexp), p=length(orig.comm.genes))
+  return(list(pval=pval, D=D))
+}
 
