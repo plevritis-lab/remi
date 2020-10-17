@@ -90,8 +90,8 @@ clusterLabelProp <- function(net, clu, clu.labeled, labelednodes) {
     fixclu <- rep(FALSE, igraph::vcount(clu.net))
     fixclu[names(initclu) %in% labelednodes] <- TRUE
     clu.comm <- igraph::membership(igraph::cluster_label_prop(clu.net,
-                                              fixed=fixclu,
-                                              initial=initclu))
+                                                              fixed=fixclu,
+                                                              initial=initclu))
 
     if(length(final.comm) != 0) {
       final.comm <- c(final.comm, clu.comm+max(final.comm))
@@ -143,6 +143,7 @@ calculateOversizedComms <- function(net, communities, dat) {
   }
   names(deg.comm) <- unique(communities)
   max_num <- max(ncol(dat), 5)
+  #max_num = 100
   oversized.comms <- which(deg.comm > max_num)
   return(names(oversized.comms))
 }
@@ -184,7 +185,11 @@ calculateCommGlasso <- function(S, x, netlist, lambda.max = 0.9,
 
   n <- nrow(x)
   d <- ncol(x)
-  if(scale == T) x <- scale(x)
+  if(scale == T) {
+    x <- scale(x)
+    S <- cor(x)
+  }
+
 
   allLRpairs <- c(lr$combo1, lr$combo2)
   filtallLRpairs <- setdiff(allLRpairs, additional)
@@ -205,8 +210,12 @@ calculateCommGlasso <- function(S, x, netlist, lambda.max = 0.9,
 
   if(is.null(lambda)) {
     bic <- c()
-    lambda.min <- 0.1
-    lambdas = exp(seq(log(lambda.min), log(lambda.max), length = 20))
+    lambda.max = max(max(S - diag(d)), -min(S - diag(d)))
+    lambda.min = 0.1 * lambda.max
+    lambdas = exp(seq(log(lambda.max), log(lambda.min), length = 20))
+
+    #lambda.min <- 0.1
+    #lambdas = exp(seq(log(lambda.min), log(lambda.max), length = 20))
     for(l in lambdas) {
       res <- glasso::glasso(S,
                             l,
@@ -221,6 +230,8 @@ calculateCommGlasso <- function(S, x, netlist, lambda.max = 0.9,
   } else {
     opt.lambda <- as.numeric(lambda)
   }
+
+  print(opt.lambda)
 
   e <- glasso::glasso(S, opt.lambda,
                       zero=pmat.zero,
@@ -243,7 +254,7 @@ calculateCommGlasso <- function(S, x, netlist, lambda.max = 0.9,
   W[,"cor"] <- getUpperTri(cor(x, method="pearson"), round = TRUE)
   W[,"lambda"] <- opt.lambda
 
-  return(list(W=data.frame(W, stringsAsFactors = F), S=S))
+  return(list(W=data.frame(W, stringsAsFactors = F), S=S, lambda=opt.lambda))
 }
 
 #' Log Likelihood
@@ -263,7 +274,7 @@ loglik_ave <- function(data, theta){
 #' @param n Sample number
 #' @return EBIC number
 #'
-EBIC <- function (S, K, n, E, gamma = 0, countDiagonal = FALSE)
+EBIC <- function (S, K, n, E, gamma = 1, countDiagonal = FALSE)
 {
   L <- logGaus(S, K, n)
   if (missing(E)) {
@@ -350,7 +361,7 @@ calculatePvalue <- function(R_, S_, D_, i_, j_, n, p) {
   null_sample = dnorm(null_sample, sd=2/sqrt(n-p))
 
   weights_ = (as.numeric(predict(clf_, newdata=data.frame(T=null_sample),
-                                        type='class')) - 1)
+                                 type='class')) - 1)
 
   weights_ = weights_ * (null_density(null_sample, S_, n=n, i=i_, j=j_)
                          / dnorm(null_sample, sd=2 / sqrt(n-p)))
@@ -361,11 +372,3 @@ calculatePvalue <- function(R_, S_, D_, i_, j_, n, p) {
 
   return(list(p=twosided_pvalue, w=weights_, w_n=(weights_ * (null_sample > R_[i_, j_]))))
 }
-
-
-
-
-
-
-
-

@@ -68,6 +68,9 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
   return(list(filtered=filtered.cellexps, unfiltered=notfiltered.cellexps))
 }
 
+
+
+
 #' Generating cell type-specific ligand receptor pair network
 #'
 #' Network used for cabernet algorithm. Nodes represent ligand and receptor genes from
@@ -125,6 +128,8 @@ expandLRpairs <- function(lr.table, datlist, celltypes) {
   return(list(lr.network.pairs=lr.network.pairs, expanddata = allcellexp))
 }
 
+
+
 #' Generating cell type-specific ligand receptor pair network
 #'
 #' Network used for cabernet algorithm. Nodes represent ligand and receptor genes from
@@ -147,12 +152,14 @@ generateLRnet <- function(lr.table, celltypes, datlist, cor=T, verbose=T) {
 
   if(verbose == T) cat("Step 3/3: Creating graph object\n")
   lr.network <- igraph::graph_from_edgelist(as.matrix(lr.network.pairs$lr.network.pairs[,c(1,2)]),
-                                    directed=F)
+                                            directed=F)
   igraph::E(lr.network)$weight <- abs(as.numeric(paste0(pairwise.cor$pairwiseLR$cor)))
 
   return(list(net=lr.network, mat=lr.network.pairs$lr.network.pairs,
               pairwisecor=pairwise.cor, expanddata=lr.network.pairs$expanddata))
 }
+
+
 
 #' calculateCor - calculating pairwise correlation for all the LR pairs
 #'
@@ -195,6 +202,9 @@ calculateCor <- function(lr.obj, randomize=F, l.chosen=NULL, r.chosen=NULL, T_st
 
   return(list(pairwiseLR=pairwise.lr, expanddata=allcellexp, lr.cor = lr.cor))
 }
+
+
+
 
 #' Calculating eigenvector centrality for each receptor given downstream
 #' protein protein-interaction signaling network.
@@ -249,7 +259,6 @@ pickECgenes <- function(lrnet, dat.list, pgenelist, numgenes, cutoff, ppi, seed=
 
       top.genes <- head(sort(cell.ec.list[[c]][singler.path], decreasing=T),
                         numgenes)
-      #top.genes <- top.genes[top.genes > 0]
       sig.top.r.path <- c(sig.top.r.path, top.genes)
     }
   }
@@ -267,6 +276,9 @@ pickECgenes <- function(lrnet, dat.list, pgenelist, numgenes, cutoff, ppi, seed=
               net=cell.nets,
               allec = all.ec))
 }
+
+
+
 
 #' cabernetCommunities
 #'
@@ -312,18 +324,16 @@ remifiedCommunities <- function(net, dat.list, lnodes, seed, verbose=T) {
     return(list(names=commnames, membership=labelprop.comms))
   }
 
-  #while(length(num.oversized) > 0) {
+  while(length(num.oversized) > 0) {
     louvain.comms <- clusterLouvain(net, num.oversized, old.comms)
     num.oversized <- calculateOversizedComms(net, louvain.comms, dat.list[[1]])
 
-    return(louvain.comms)
-
-  #  if(length(setdiff(num.oversized, old.oversized)) == 0) {
-  #    break
-  #  }
+    if(length(setdiff(num.oversized, old.oversized)) == 0) {
+      break
+    }
     old.comms <- louvain.comms
     old.oversized <- num.oversized
-  #}
+  }
 
   size.communities <- table(louvain.comms)
   commnames <- unique(names(size.communities[size.communities > 1]))
@@ -332,6 +342,11 @@ remifiedCommunities <- function(net, dat.list, lnodes, seed, verbose=T) {
 
   return(list(names=commnames, membership=louvain.comms))
 }
+
+
+
+
+
 
 #' Calculate graphical lasso on each community to sparsify the network
 #'
@@ -393,6 +408,8 @@ remifiedGlasso <- function(netlist, communities, dat.list, seednum, lambda, scal
 
     adjcomms <- setdiff(unique(comm1.adjedges$comm1, comm1.adjedges$comm2), comm1.num)
 
+    adjcomms <- adjcomms[which(as.numeric(adjcomms) > as.numeric(comm1.num))]
+
     if(length(adjcomms) == 0) {
       noadjcomms <- c(noadjcomms, comm1.num)
     } else {
@@ -409,8 +426,8 @@ remifiedGlasso <- function(netlist, communities, dat.list, seednum, lambda, scal
 
         betweencommedges <- findAdjacentCommEdges(netlist, commgenes, communities) %>%
           dplyr::filter((comm1 == comm1.num & comm2 == comm2.num) |
-                   (comm1 == comm2.num & comm2 == comm1.num)) %>%
-                   dplyr::filter(comm1 != comm2)
+                          (comm1 == comm2.num & comm2 == comm1.num)) %>%
+          dplyr::filter(comm1 != comm2)
 
         betweengenes <- unique(c(betweencommedges$name1, betweencommedges$name2))
 
@@ -434,6 +451,11 @@ remifiedGlasso <- function(netlist, communities, dat.list, seednum, lambda, scal
 
   return(gedges_w)
 }
+
+
+
+
+
 
 #' Cleaning Output
 #'
@@ -472,14 +494,39 @@ cleaningOutput <- function(input, netlist) {
     dplyr::mutate(n = dplyr::n()) %>%
     dplyr::ungroup()
 
-  filtered.net.edges <- net.edges %>%
+  commIDs <- unique(net.edges$commnum)
+
+  between.comms <- commIDs[grep("_", commIDs)]
+
+  if(length(between.comms) > 0) {
+    within.comms <- commIDs[-grep("_", commIDs)]
+  } else {
+    within.comms <- commIDs
+  }
+
+  within.edges <- net.edges %>%
+    filter(commnum %in% within.comms)
+
+  between.edges <- net.edges %>%
+    filter(commnum %in% between.comms)
+
+  between.edges <- between.edges %>%
+    filter(!(pairname %in% within.edges$pairname))
+
+  net.edges.filt <- bind_rows(within.edges, between.edges)
+
+  filtered.net.edges <- net.edges.filt %>%
     dplyr::filter(abs(as.numeric(weight)) > 0)
 
-  return(list(net.edges=net.edges, filtered.net.edges=filtered.net.edges))
+  return(list(net.edges=net.edges.filt, filtered.net.edges=filtered.net.edges))
 }
 
 
-#' Cabernet algorithm
+
+
+
+
+#' REMI algorithm
 #'
 #' Identifies communities in LR network and then performs graphical lasso
 #' on the communites in the network to predict significant ligand
@@ -514,8 +561,6 @@ remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1, lambda=NU
   commdetect.output <- remifiedCommunities(netlist$net, dat.list$filtered,
                                            labelednodes$eclist, seed)
 
-  return(commdetect.output)
-
   # Graphical Lasso
   cat("\n Estimating activated LR pairs \n")
   glasso.output <- remifiedGlasso(netlist, commdetect.output, dat.list$filtered, seed, lambda, scale=F)
@@ -540,9 +585,15 @@ remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1, lambda=NU
               interactome=predicted.edges$filtered.net.edges,
               communities=commdetect.output,
               params=params))
+
 }
 
-#' Making chord diagram for caberNET results
+
+
+
+
+
+#' Making chord diagram for REMI results
 #'
 #'
 #' @param  interactome Predicted interactome
@@ -575,10 +626,10 @@ REMIPlot <- function(interactome, type="Sankey", grid.col=NULL) {
 
   if(type == "chord") {
     circlize::chordDiagram(df2,
-                 grid.col=grid.col,
-                 directional=1,
-                 direction.type = c("diffHeight", "arrows"),
-                 annotationTrack = c("grid"), link.lwd = lwd_mat)
+                           grid.col=grid.col,
+                           directional=1,
+                           direction.type = c("diffHeight", "arrows"),
+                           annotationTrack = c("grid"), link.lwd = lwd_mat)
 
     legend("right",
            legend = names(grid.col),
@@ -773,4 +824,3 @@ calculateSignificance <- function(obj,
                           n=ncol(allcellexp), p=length(orig.comm.genes))
   return(list(pval=pval, D=D))
 }
-
