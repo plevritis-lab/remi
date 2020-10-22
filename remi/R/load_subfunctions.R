@@ -143,7 +143,6 @@ calculateOversizedComms <- function(net, communities, dat) {
   }
   names(deg.comm) <- unique(communities)
   max_num <- max(ncol(dat), 5)
-  #max_num = 100
   oversized.comms <- which(deg.comm > max_num)
   return(names(oversized.comms))
 }
@@ -230,8 +229,6 @@ calculateCommGlasso <- function(S, x, netlist, lambda.max = 0.9,
   } else {
     opt.lambda <- as.numeric(lambda)
   }
-
-  print(opt.lambda)
 
   e <- glasso::glasso(S, opt.lambda,
                       zero=pmat.zero,

@@ -379,7 +379,8 @@ remifiedGlasso <- function(netlist, communities, dat.list, seednum, lambda, scal
     lr.mat <- t(allcellexp[which(rownames(allcellexp) %in% commgenes),])
     lr.comm.net <- igraph::induced_subgraph(netlist$net, colnames(lr.mat))
 
-    W <- calculateCommGlasso(cor(lr.mat), lr.mat, netlist, lambda.max=0.9, lambda=lambda, scale=scale)
+    W <- calculateCommGlasso(cor(lr.mat), lr.mat, netlist, lambda.max=0.9,
+                             lambda=lambda, scale=scale)
 
     lr.W <- data.table::data.table(W$W) %>%
       dplyr::mutate(commnum = communitynum) %>%
@@ -539,12 +540,18 @@ cleaningOutput <- function(input, netlist) {
 #' @return List of cabernet predictions
 #' @export
 #'
-remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1, lambda=NULL) {
+remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1,
+                 lambda=NULL, lr.database=NULL, downstreamgenes=NULL, ppi.net=NULL) {
+
+  if(is.null(lr.database)) {lr.database = curr.lr.filt}
+  if(is.null(downstreamgenes)) {downstreamgenes = pathway.genelist}
+  if(is.null(ppi.net)) {ppi.net = g.biogrid}
 
   # Creating LR network
   cat("Building LR network\n")
-  netlist <- generateLRnet(curr.lr.filt, cellmarkers,
-                           dat.list$filtered, pathway.genes)
+  pathwaygenes <- unique(unlist(pathway.genelist$genesets))
+  netlist <- generateLRnet(lr.database, cellmarkers,
+                           dat.list$filtered, downstreamgenes)
 
   #Identify influential receptors
   cat("Identifying influential receptors\n")
@@ -553,7 +560,7 @@ remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1, lambda=NU
                               pathway.genelist$genesets,
                               numgenes = numgenes,
                               cutoff = cutoff,
-                              ppi = g.biogrid,
+                              ppi = ppi.net,
                               seed=seed)
 
   # Cluster
@@ -817,8 +824,6 @@ calculateSignificance <- function(obj,
   }
 
   D <- list(T=T.list, Y=Y.list)
-
-  print(table(D$Y))
 
   pval <- calculatePvalue(R, S, D, i_=l.ind, j_=r.ind,
                           n=ncol(allcellexp), p=length(orig.comm.genes))
