@@ -209,7 +209,6 @@ calculateCor <- function(lr.obj, randomize=F, l.chosen=NULL, r.chosen=NULL, T_st
 #' Calculating eigenvector centrality for each receptor given downstream
 #' protein protein-interaction signaling network.
 #'
-#'
 #' @param  lrnet List of cell type-specific LR pairs
 #' @param dat.list List of gene expression for each cell type
 #' @param pgenelist TO BE REMOVED
@@ -230,9 +229,7 @@ pickECgenes <- function(lrnet, dat.list, pgenelist, numgenes, cutoff, ppi, seed=
   for(c in names(dat.list)) {
     receive.exp <- t(scale(t(dat.list[[c]])))
     receive.net <- makePPINetwork(receive.exp, unique(lr.table$L), pgenes, c, lr.table, ppi)
-    #if(!is.na(receive.net[1])) {
     cell.nets[[c]] <- receive.net
-    #}
   }
 
   if(verbose == T) cat("Calculating importance score\n")
@@ -280,7 +277,7 @@ pickECgenes <- function(lrnet, dat.list, pgenelist, numgenes, cutoff, ppi, seed=
 
 
 
-#' cabernetCommunities
+#' remifiedCommunities
 #'
 #' Community detection ft. label propagation and louvain clustering on
 #' the LR network
@@ -292,7 +289,8 @@ pickECgenes <- function(lrnet, dat.list, pgenelist, numgenes, cutoff, ppi, seed=
 #' @return Communities in LR network
 #' @export
 #'
-remifiedCommunities <- function(net, dat.list, lnodes, seed, verbose=T) {
+remifiedCommunities <- function(net, dat.list, lnodes, seed, verbose=T,
+                                cd) {
   set.seed(seed)
   # Identifying what components have a labeled receptor
   clu <- igraph::membership(igraph::components(net))
@@ -304,10 +302,15 @@ remifiedCommunities <- function(net, dat.list, lnodes, seed, verbose=T) {
   # Final list of communities
   lr.communities <- c()
 
-  # Clustering using label propagation to seed out important receptors
-  labelprop.comms <- clusterLabelProp(net, clu, labeled.comm.names, lnodes)
+  if(cd == "LP") {
+    # Clustering using label propagation to seed out important receptors
+    labelprop.comms <- clusterLabelProp(net, clu, labeled.comm.names, lnodes)
 
-  if(length(unique(labelprop.comms)) == 1) {
+    if(length(unique(labelprop.comms)) == 1) {
+      labelprop.comms <- membership(cluster_louvain(net))
+    }
+  }
+  if(cd == "Louvain") {
     labelprop.comms <- membership(cluster_louvain(net))
   }
 
@@ -541,7 +544,8 @@ cleaningOutput <- function(input, netlist) {
 #' @export
 #'
 remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1,
-                 lambda=NULL, lr.database=NULL, downstreamgenes=NULL, ppi.net=NULL) {
+                 lambda=NULL, lr.database=NULL, downstreamgenes=NULL, ppi.net=NULL,
+                 cd = "LP") {
 
   if(is.null(lr.database)) {lr.database = curr.lr.filt}
   if(is.null(downstreamgenes)) {downstreamgenes = pathway.genelist}
@@ -557,7 +561,7 @@ remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1,
   cat("Identifying influential receptors\n")
   labelednodes <- pickECgenes(netlist,
                               dat.list$unfiltered,
-                              pathway.genelist$genesets,
+                              downstreamgenes$genesets,
                               numgenes = numgenes,
                               cutoff = cutoff,
                               ppi = ppi.net,
@@ -566,7 +570,9 @@ remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1,
   # Cluster
   cat("Detecting communities")
   commdetect.output <- remifiedCommunities(netlist$net, dat.list$filtered,
-                                           labelednodes$eclist, seed)
+                                           labelednodes$eclist,
+                                           seed=seed,
+                                           cd=cd)
 
   # Graphical Lasso
   cat("\n Estimating activated LR pairs \n")
