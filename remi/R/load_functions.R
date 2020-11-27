@@ -289,33 +289,19 @@ pickECgenes <- function(lrnet, dat.list, pgenelist, numgenes, cutoff, ppi, seed=
 #' @return Communities in LR network
 #' @export
 #'
-remifiedCommunities <- function(net, dat.list, lnodes, seed, verbose=T,
-                                cd) {
+remifiedCommunities <- function(net, dat.list, seed, verbose=T,
+                                cd, maxNum) {
   set.seed(seed)
-  # Identifying what components have a labeled receptor
-  clu <- igraph::membership(igraph::components(net))
-
-  labeled.comm.all <- table(clu[names(lnodes)])
-  labeled.comm.names <- names(labeled.comm.all[labeled.comm.all>1])
-  labeled.comm.names <- names(labeled.comm.all)
 
   # Final list of communities
   lr.communities <- c()
 
-  if(cd == "LP") {
-    # Clustering using label propagation to seed out important receptors
-    labelprop.comms <- clusterLabelProp(net, clu, labeled.comm.names, lnodes)
-
-    if(length(unique(labelprop.comms)) == 1) {
-      labelprop.comms <- membership(cluster_louvain(net))
-    }
-  }
   if(cd == "Louvain") {
     labelprop.comms <- membership(cluster_louvain(net))
   }
 
   # Calculate degree of each network and check how many are
-  num.oversized <- calculateOversizedComms(net, labelprop.comms, dat.list[[1]])
+  num.oversized <- calculateOversizedComms(net, labelprop.comms, dat.list[[1]], maxNum = maxNum)
 
   # Iterate through all the communities until their degrees match the sample size
   old.comms <- labelprop.comms
@@ -543,9 +529,9 @@ cleaningOutput <- function(input, netlist) {
 #' @return List of cabernet predictions
 #' @export
 #'
-remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1,
+remi <- function(cellmarkers, dat.list, seed=30,
                  lambda=NULL, lr.database=NULL, downstreamgenes=NULL, ppi.net=NULL,
-                 cd = "LP") {
+                 cd = "LP", maxNum = NULL) {
 
   if(is.null(lr.database)) {lr.database = curr.lr.filt}
   if(is.null(downstreamgenes)) {downstreamgenes = pathway.genelist}
@@ -556,23 +542,12 @@ remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1,
   pathwaygenes <- unique(unlist(pathway.genelist$genesets))
   netlist <- generateLRnet(lr.database, cellmarkers,
                            dat.list$filtered, downstreamgenes)
-
-  #Identify influential receptors
-  cat("Identifying influential receptors\n")
-  labelednodes <- pickECgenes(netlist,
-                              dat.list$unfiltered,
-                              downstreamgenes$genesets,
-                              numgenes = numgenes,
-                              cutoff = cutoff,
-                              ppi = ppi.net,
-                              seed=seed)
-
   # Cluster
   cat("Detecting communities")
   commdetect.output <- remifiedCommunities(netlist$net, dat.list$filtered,
-                                           labelednodes$eclist,
                                            seed=seed,
-                                           cd=cd)
+                                           cd=cd,
+                                           maxNum = maxNum)
 
   # Graphical Lasso
   cat("\n Estimating activated LR pairs \n")
@@ -588,12 +563,9 @@ remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1,
   }
 
   params <- list()
-  params[["numgenes"]] <- numgenes
-  params[["cutoff"]] <- cutoff
   params[["seed"]] <- seed
 
   return(list(lrnet=netlist,
-              ir=labelednodes,
               unfilteredinteractome=predicted.edges$net.edges,
               interactome=predicted.edges$filtered.net.edges,
               communities=commdetect.output,
@@ -614,7 +586,7 @@ remi <- function(cellmarkers, dat.list, seed=30, numgenes=2, cutoff=1,
 #' @return Chord Diagram highlighting proportion of cell-types in interactome
 #' @export
 #'
-REMIPlot <- function(interactome, type="Sankey", grid.col=NULL) {
+REMIPlot <- function(interactome, type="Sankey", grid.col=NULL, size=10) {
   chord.format <- interactome$interactome %>%
     dplyr::mutate(node1 = paste0(n1cell, "_", ligand)) %>%
     dplyr::mutate(node2 = paste0(n2cell, "_", receptor))
@@ -640,8 +612,8 @@ REMIPlot <- function(interactome, type="Sankey", grid.col=NULL) {
   if(type == "chord") {
     circlize::chordDiagram(df2,
                            grid.col=grid.col,
-                           directional=1,
-                           direction.type = c("diffHeight", "arrows"),
+                           #directional=1,
+                           #direction.type = c("diffHeight", "arrows"),
                            annotationTrack = c("grid"), link.lwd = lwd_mat)
 
     legend("right",
@@ -651,31 +623,16 @@ REMIPlot <- function(interactome, type="Sankey", grid.col=NULL) {
            bty="n")
   }
 
-  if(type == "sankey") {
-    links <- df2
-    colnames(links) <- c("source", "target", "value")
-    links$source <- paste0("Source_", links$source)
-    links$target <- paste0("Target_", links$target)
-    # From these flows we need to create a node data frame: it lists every entities involved in the flow
-    nodes <- data.frame(
-      name=unique(c(links$source, links$target))
-    )
-
-    # With networkD3, connection must be provided using id, not using real name like in the links dataframe.. So we need to reformat it.
-    links$IDsource <- match(links$source, nodes$name)-1
-    links$IDtarget <- match(links$target, nodes$name)-1
-
-    nodes$name <- gsub('Source_', '', nodes$name)
-    nodes$name <- gsub('Target_', '', nodes$name)
-
-    # Make the Network
-    my_color <- 'd3.scaleOrdinal().domain(["I", "E", "F", "M"]).range(["#195188", "#AC371F", "#BB6A23", "#00503C"])'
-
-    p <- sankeyNetwork(Links = links, Nodes = nodes,
-                       Source = "IDsource", Target = "IDtarget",
-                       Value = "value", NodeID = "name",
-                       sinksRight=FALSE,
-                       colourScale = my_color)
+  if(type == "alluvial") {
+    p <- ggplot(df2,
+           aes(y = count, axis1 = n1cell, axis2 = n2cell)) +
+      geom_alluvium(aes(fill = n1cell), width = 1/12) +
+      geom_stratum(width = 1/12) +
+      geom_text(stat = "stratum", aes(label = after_stat(stratum)), size=size) +
+      scale_x_discrete(limits = c("Signaling", "Receiving"), expand = c(.05, .05)) +
+      scale_fill_manual(values=grid.col) +
+      coord_flip() +
+      theme_void()
 
     return(p)
   }
@@ -782,7 +739,8 @@ calculateSignificance <- function(obj,
                                            cellexp.list$filtered,
                                            ec.nodes$eclist,
                                            param$seed,
-                                           verbose=F)
+                                           verbose=F,
+                                           maxNum = maxNum)
 
     commnums.boot <- commboot.output$membership
 
