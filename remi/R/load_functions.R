@@ -301,7 +301,8 @@ remifiedCommunities <- function(net, dat.list, seed, verbose=T,
   }
 
   # Calculate degree of each network and check how many are
-  num.oversized <- calculateOversizedComms(net, labelprop.comms, dat.list[[1]], maxNum = maxNum)
+  num.oversized <- calculateOversizedComms(net, labelprop.comms,
+                                           dat.list[[1]], maxNum = maxNum)
 
   # Iterate through all the communities until their degrees match the sample size
   old.comms <- labelprop.comms
@@ -315,7 +316,7 @@ remifiedCommunities <- function(net, dat.list, seed, verbose=T,
 
   while(length(num.oversized) > 0) {
     louvain.comms <- clusterLouvain(net, num.oversized, old.comms)
-    num.oversized <- calculateOversizedComms(net, louvain.comms, dat.list[[1]])
+    num.oversized <- calculateOversizedComms(net, louvain.comms, dat.list[[1]], maxNum = maxNum)
 
     if(length(setdiff(num.oversized, old.oversized)) == 0) {
       break

@@ -134,16 +134,15 @@ clusterLouvain <- function(net, commnums, communities) {
 #' @param dat Dataset of one cell type
 #' @return List of maximum degree in each community
 #'
-calculateOversizedComms <- function(net, communities, dat, maxNum=NULL) {
+calculateOversizedComms <- function(net, communities, dat, maxNum) {
   deg.comm <- c()
   for(i in unique(communities)){
     deg.comm <- c(deg.comm,
-                  calculateNetVars(net,
-                                   names(communities[communities==i]))$numnodes)
+                  calculateNetVars(net, names(communities[communities==i]))$numnodes)
   }
   names(deg.comm) <- unique(communities)
-  if(is.null(maxNum)) {maxNum = ncol(dat)}
-  max_num <- max(ncol(dat), 5)
+  if(is.null(maxNum)) { maxNum = ncol(dat) }
+  max_num <- max(maxNum, 5)
   oversized.comms <- which(deg.comm > max_num)
   return(names(oversized.comms))
 }
