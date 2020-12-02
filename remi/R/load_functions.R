@@ -16,7 +16,8 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
 
   colsvec <- c()
   for(curr.name in cellmarkers) {
-    celltype.filt <- dat[,grep(curr.name, colnames(dat))]
+    print(curr.name)
+    celltype.filt <- dat[,grep(paste0("_", curr.name), colnames(dat))]
 
     dat.cols <- unique(unlist(lapply(colnames(celltype.filt),
                                      function(x) {strsplit(x, "_")[[1]][1]})))
@@ -41,6 +42,8 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
   }
 
   allpresent.cols <- names(which(table(colsvec) == length(cellmarkers)))
+
+  print("here")
 
   #filtering non-filtered data
   for(c in names(notfiltered.cellexps)) {
