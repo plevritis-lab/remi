@@ -23,12 +23,7 @@ REMI takes in normalized and scaled RNA-sequencing data as an input, where the c
 
 For usage tutorials, check the `vignettes` directory of the repo. 
 
-* NEW: [Basic Interactome Reconstruction from Flow-Sorted Bulk RNA-Seq](http://htmlpreview.github.io/?https://github.com/ayu1/remi/vignettes/REMI_Tutorial.html)
-
-
-```
-interactome <- remi(data, filter=T)
-```
+* NEW: [Basic Interactome Reconstruction from Flow-Sorted Bulk RNA-Seq](http://htmlpreview.github.io/?https://github.com/ayu1/remi/blob/master/vignettes/REMI_Tutorial.html)
 
 ## Contact
 Email: ayu1@stanford.edu
