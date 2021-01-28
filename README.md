@@ -23,7 +23,7 @@ REMI takes in normalized and scaled RNA-sequencing data as an input, where the c
 
 For usage tutorials, check the `vignettes` directory of the repo. 
 
-* NEW: [Iterative Single-Cell Multi-Omic Integration Using Online iNMF](http://htmlpreview.github.io/?https://github.com/ayu1/remi/blob/master/vignettes/online_iNMF_tutorial.html)
+* NEW: [Basic Interactome Reconstruction from Flow-Sorted Bulk RNA-Seq](http://htmlpreview.github.io/?https://github.com/ayu1/remi/blob/master/vignettes/REMI_Tutorial.html)
 
 
 ```
