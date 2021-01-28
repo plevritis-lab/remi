@@ -16,7 +16,7 @@ Reading in dataset:
 To-Do: get rid of cell markers! 
 - create tutorial for Seurat object integration
 ```{r}
-adeno.data <- read.csv("/Users/ayu1/Documents/normalizedU01_2020_logged.csv",
+adeno.data <- read.csv("~/Projects/rotation_remi/data/test/bulk_flowsort/U01Adeno_logged.csv",
                        row.names=1)
 colnames(adeno.data) <- gsub("_CD45", "_I", colnames(adeno.data))
 colnames(adeno.data) <- gsub("_CD31", "_E", colnames(adeno.data))
