@@ -1,0 +1,33 @@
+Package: remi
+Title: Regularized Microenvironment Interactome
+Version: 0.0.0.9000
+Authors@R:
+    person(given = "Alice",
+           family = "Yu",
+           role = c("aut", "cre"),
+           email = "ayu1@stanford.edu",
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: REMI is a computational algorithm that predicts potentially activating or inhibiting ligand receptor pairs given RNA-sequencing data.
+License: `use_mit_license()`, `use_gpl3_license()` or friends to
+    pick a license
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.0
+Imports:
+    data.table,
+    tidyverse,
+    qgraph,
+    igraph,
+    glasso,
+    Matrix,
+    OneR,
+    circlize,
+    magrittr,
+    dplyr
+Depends:
+    R (>= 2.10)
+Suggests:
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
