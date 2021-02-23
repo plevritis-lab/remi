@@ -1,9 +1,10 @@
 # REMI (Regularized Microenvironment Interactome)
 
-## Quick Start
-[Bulk Flow-Sorted RNA-Seq](http://htmlpreview.github.io/?https://github.com/ayu1/remi/blob/master/vignettes/REMI_Tutorial.html)
+## Tutorials
+[Bulk Flow-Sorted RNA-Seq in R](http://htmlpreview.github.io/?https://github.com/ayu1/remi/blob/master/vignettes/REMI_Tutorial.html)
 
-
+- Single cell RNA-Seq data in R
+- Python adaption for REMI
 
 ## Description
 The REMI R package is designed to predict ligand receptor interactions within a microenvironment given RNA-sequencing data. It regularizes communities of ligand and receptors that have a high probability of being transcriptionally linked. 
