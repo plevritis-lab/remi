@@ -16,7 +16,7 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
 
   colsvec <- c()
   for(curr.name in cellmarkers) {
-    print(curr.name)
+
     celltype.filt <- dat[,grep(paste0("_", curr.name), colnames(dat))]
 
     dat.cols <- unique(unlist(lapply(colnames(celltype.filt),
@@ -68,7 +68,13 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
     }
   }
 
-  return(list(filtered=filtered.cellexps, unfiltered=notfiltered.cellexps))
+  if(filter == F) {
+    return(list(filtered = notfiltered.cellexps,
+                unfiltered = notfiltered.cellexps))
+  } else {
+    return(list(filtered=filtered.cellexps,
+                unfiltered=notfiltered.cellexps))
+  }
 }
 
 
@@ -292,34 +298,41 @@ pickECgenes <- function(lrnet, dat.list, pgenelist, numgenes, cutoff, ppi, seed=
 #' @return Communities in LR network
 #' @export
 #'
-remifiedCommunities <- function(net, dat.list, seed, verbose=T,
-                                cd, maxNum) {
+remifiedCommunities <- function(net, dat.list,
+                                seed, verbose=T,
+                                cd = "Louvain", maxNum) {
   set.seed(seed)
 
   # Final list of communities
   lr.communities <- c()
 
   if(cd == "Louvain") {
-    labelprop.comms <- membership(cluster_louvain(net))
+    density.comms <- membership(cluster_louvain(net))
   }
 
   # Calculate degree of each network and check how many are
-  num.oversized <- calculateOversizedComms(net, labelprop.comms,
-                                           dat.list[[1]], maxNum = maxNum)
+  num.oversized <- calculateOversizedComms(net,
+                                           density.comms,
+                                           dat.list[[1]],
+                                           maxNum = maxNum)
 
-  # Iterate through all the communities until their degrees match the sample size
-  old.comms <- labelprop.comms
+  # Iterate through all the communities until their
+  # degrees match the sample size
+  old.comms <- density.comms
   old.oversized <- num.oversized
 
   if(length(num.oversized) == 0) {
-    size.communities <- table(labelprop.comms)
+    size.communities <- table(density.comms)
     commnames <- unique(names(size.communities[size.communities > 1]))
-    return(list(names=commnames, membership=labelprop.comms))
+    return(list(names=commnames, membership=density.comms))
   }
 
   while(length(num.oversized) > 0) {
     louvain.comms <- clusterLouvain(net, num.oversized, old.comms)
-    num.oversized <- calculateOversizedComms(net, louvain.comms, dat.list[[1]], maxNum = maxNum)
+    num.oversized <- calculateOversizedComms(net,
+                                             louvain.comms,
+                                             dat.list[[1]],
+                                             maxNum = maxNum)
 
     if(length(setdiff(num.oversized, old.oversized)) == 0) {
       break
@@ -331,7 +344,8 @@ remifiedCommunities <- function(net, dat.list, seed, verbose=T,
   size.communities <- table(louvain.comms)
   commnames <- unique(names(size.communities[size.communities > 1]))
 
-  if(verbose == T) cat(paste0(length(commnames), " communities identified\n"))
+  if(verbose == T) cat(paste0(length(commnames),
+                              " communities identified\n"))
 
   return(list(names=commnames, membership=louvain.comms))
 }
@@ -512,12 +526,9 @@ cleaningOutput <- function(input, netlist) {
   filtered.net.edges <- net.edges.filt %>%
     dplyr::filter(abs(as.numeric(weight)) > 0)
 
-  return(list(net.edges=net.edges.filt, filtered.net.edges=filtered.net.edges))
+  return(list(net.edges=net.edges.filt,
+              filtered.net.edges=filtered.net.edges))
 }
-
-
-
-
 
 
 #' REMI algorithm
@@ -534,8 +545,9 @@ cleaningOutput <- function(input, netlist) {
 #' @export
 #'
 remi <- function(cellmarkers, dat.list, seed=30,
-                 lambda=NULL, lr.database=NULL, downstreamgenes=NULL, ppi.net=NULL,
-                 cd = "LP", maxNum = NULL) {
+                 lambda=NULL, lr.database=NULL,
+                 downstreamgenes=NULL, ppi.net=NULL,
+                 cd = "Louvain", maxNum = NULL) {
 
   if(is.null(lr.database)) {lr.database = curr.lr.filt}
   if(is.null(downstreamgenes)) {downstreamgenes = pathway.genelist}
@@ -555,11 +567,14 @@ remi <- function(cellmarkers, dat.list, seed=30,
 
   # Graphical Lasso
   cat("\n Estimating activated LR pairs \n")
-  glasso.output <- remifiedGlasso(netlist, commdetect.output, dat.list$filtered, seed, lambda, scale=F)
+  glasso.output <- remifiedGlasso(netlist, commdetect.output,
+                                  dat.list$filtered, seed,
+                                  lambda, scale=F)
 
   predicted.edges <- cleaningOutput(glasso.output, netlist)
 
-  numLRs <- length(unique(predicted.edges$filtered.net.edges$node1, predicted.edges$filtered.net.edges$node2))
+  numLRs <- length(unique(predicted.edges$filtered.net.edges$node1,
+                          predicted.edges$filtered.net.edges$node2))
 
   if(nrow(predicted.edges$filtered.net.edges) == 0) {
     cat("\nNo interactome found\n")
@@ -656,10 +671,16 @@ REMIPlot <- function(interactome, type="Sankey", grid.col=NULL, size=10) {
 #' @return Chord Diagram highlighting proportion of cell-types in interactome
 #' @export
 #'
+#'
+#'
+#'
 calculateSignificance <- function(obj,
-                                  l.chosen, r.chosen,
+                                  l.chosen,
+                                  r.chosen,
                                   comm.chosen,
-                                  iterNum = 1000, seednum=30,
+                                  maxNum,
+                                  iterNum = 1000,
+                                  seednum=30,
                                   lambda = NULL) {
 
   # Setting Varibales
@@ -703,7 +724,7 @@ calculateSignificance <- function(obj,
   l.ind <- which(colnames(R) == l.chosen)
   r.ind <- which(colnames(R) == r.chosen)
 
-  if(length(l.ind) == 0) {cat("LR pair not in community")}
+  if(length(l.ind) == 0) { cat("LR pair not in community") }
 
   comm.change <- 0
 
@@ -728,21 +749,9 @@ calculateSignificance <- function(obj,
     boot.net <- graph_from_edgelist(as.matrix(R_star_cor_df$pairwiseLR[,c("L", "R")]), directed=F)
     E(boot.net)$weight <- abs(as.numeric(R_star_cor_df$pairwiseLR[,"cor"]))
 
-    ec.nodes <- pickECgenes(list(net=boot.net,
-                                 mat=R_star_cor_df$pairwiseLR[,c("L", "R")],
-                                 expanddata=allcellexp),
-                            cellexp.list$filtered,
-                            pathway.genelist$genesets,
-                            numgenes = param$numgenes,
-                            cutoff = param$cutoff,
-                            ppi = g.biogrid,
-                            seed = param$seed,
-                            verbose = F)
-
-    commboot.output <- remifiedCommunities(boot.net,
-                                           cellexp.list$filtered,
-                                           ec.nodes$eclist,
-                                           param$seed,
+    commboot.output <- remifiedCommunities(net=boot.net,
+                                           dat.list=cellexp.list$filtered,
+                                           seed=param$seed,
                                            verbose=F,
                                            maxNum = maxNum)
 
@@ -775,8 +784,14 @@ calculateSignificance <- function(obj,
     comm.cor <- R_star_cor_df$lr.cor[which(rownames(R_star_cor_df$lr.cor) %in% lr.boot.genes),
                                      which(colnames(R_star_cor_df$lr.cor) %in% lr.boot.genes)]
 
-    g <- calculateCommGlasso(comm.cor, comm.mat, obj$lrnet, scale=T, lambda=opt.lambda)$W %>%
+    View(comm.cor)
+
+    g <- calculateCommGlasso(comm.cor, comm.mat, obj$lrnet,
+                             lambda=opt.lambda,
+                             scale=F)$W %>%
       mutate(weight = if_else(abs(as.numeric(weight)) > 0, 1, 0))
+
+    #View(g)
 
     node.ind <- which(g$node1 == l.chosen & g$node2 == r.chosen)
     if(length(node.ind) == 0) {
@@ -794,6 +809,142 @@ calculateSignificance <- function(obj,
   D <- list(T=T.list, Y=Y.list)
 
   pval <- calculatePvalue(R, S, D, i_=l.ind, j_=r.ind,
-                          n=ncol(allcellexp), p=length(orig.comm.genes))
+                          n=ncol(allcellexp),
+                          p=length(orig.comm.genes))
+
   return(list(pval=pval, D=D))
+}
+
+#' Creating single cell REMI object
+#'
+#'
+#' @param  obj REMI object
+#' @param celltype.col what cell types to measure
+#' @param remove.markers cell types that should not be used for calculations
+#' @param gene.selct genes of interest
+#' @param assay = Seurat assay
+#' @param filter = remove low expressed ligand and receptors
+#' @param thres = average assay expression filter
+#' @return Single cell REMI object that can be used by the algorithm
+#' @export
+#'
+#'
+#'
+setupSingleCell <- function(obj, celltype.col, remove.markers, gene.select = NULL,
+                            assay="integrated", filter=T, thres=0) {
+  pseudobulk <- SingleToBulk(obj, assay)
+
+  num.markers <- length(pseudobulk$cellmarkers) - length(remove.markers)
+
+  filtered.cellexps <- list()
+  notfiltered.cellexps <- list()
+
+  colsvec <- c()
+  for(i in 1:length(pseudobulk$cellmarkers)) {
+    curr.name <- pseudobulk$cellmarkers[i]
+    if(!(curr.name %in% remove.markers)) {
+
+      nospace.name <- as.character(gsub(" ", "", curr.name))
+
+      all.cols <- unlist(lapply(colnames(pseudobulk$dat),
+                                function(x) {strsplit(x, "_")[[1]][2]}))
+      all.cols <- gsub(" ", "", all.cols)
+
+      cell.cols <- grep(paste0("\\b", nospace.name, "\\b"), all.cols)
+      celltype.filt <- pseudobulk$dat[,cell.cols]
+
+      # Match sample name
+      dat.cols <- unlist(lapply(colnames(celltype.filt),
+                                function(x) {strsplit(x, "_")[[1]][1]}))
+
+      colsvec <- c(colsvec, dat.cols)
+
+      # Removing genes with low expression
+      removegenes <- rownames(celltype.filt)[which(rowMeans(celltype.filt) <= thres)]
+
+      # Finalized cleaned data matrix
+      cleaned.filt <- pseudobulk$scaleddat[-which(rownames(pseudobulk$scaleddat) %in% removegenes),cell.cols]
+
+      # Adding in cell type into rownames
+      rownames(celltype.filt) <- paste0(curr.name, "_", rownames(celltype.filt))
+      colnames(celltype.filt) <- dat.cols
+
+      rownames(cleaned.filt) <- paste0(curr.name, "_", rownames(cleaned.filt))
+      colnames(cleaned.filt) <- dat.cols
+
+      if(is.null(gene.select)) {
+        print(dim(cleaned.filt))
+        filtered.cellexps[[curr.name]] <- cleaned.filt
+        notfiltered.cellexps[[curr.name]] <- celltype.filt
+      } else {
+        filtered.cellexps[[curr.name]] <- cleaned.filt[which(rownames(cleaned.filt) %in% gene.select),]
+        notfiltered.cellexps[[curr.name]] <- celltype.filt[which(rownames(celltype.filt) %in% gene.select),]
+      }
+    }
+  }
+
+  allpresent.cols <- names(which(table(colsvec) == num.markers))
+
+  #Filtering non-filtered data
+  for(c in names(notfiltered.cellexps)) {
+    allpresent.filt.data <- notfiltered.cellexps[[c]][,which(colnames(notfiltered.cellexps[[c]]) %in% allpresent.cols)]
+
+    duplicate.cols <- which(apply(allpresent.filt.data, 1,
+                                  function(x) length(unique(x))==1) == TRUE)
+    if(length(duplicate.cols) > 0) {
+      notfiltered.cellexps[[c]] <- allpresent.filt.data[-duplicate.cols,]
+    } else {
+      notfiltered.cellexps[[c]] <- allpresent.filt.data
+    }
+  }
+
+  # Only using samples that have all the cell types of interest
+  for(c in names(filtered.cellexps)) {
+    allpresent.filt.data <- filtered.cellexps[[c]][,allpresent.cols]
+    duplicate.cols <- which(apply(allpresent.filt.data, 1,
+                                  function(x) length(unique(x))==1) == TRUE)
+    if(length(duplicate.cols) > 0) {
+      filtered.cellexps[[c]] <- allpresent.filt.data[-duplicate.cols,]
+    } else {
+      filtered.cellexps[[c]] <- allpresent.filt.data
+    }
+  }
+
+  if(filter == F) {
+    return(list(filtered=notfiltered.cellexps, unfiltered=notfiltered.cellexps, cellmarkers=pseudobulk$cellmarkers))
+  } else {
+    return(list(filtered=filtered.cellexps, unfiltered=notfiltered.cellexps, cellmarkers=pseudobulk$cellmarkers))
+  }
+}
+
+#' Averaging across expression levels
+#'
+#'
+#' @param obj REMI object
+#' @param assay what Seurat assay to use for calculations
+#' @return Average expressiona cross patients
+#' @export
+#'
+#'
+#'
+SingleToBulk <- function(obj, assay) {
+  temp.rownames <- rownames(obj@meta.data)
+  obj@meta.data <- obj@meta.data %>%
+    mutate(group.ctype = paste0(sample, "_" , cell_type))
+  rownames(obj@meta.data) <- temp.rownames
+
+  Idents(obj) <- "group.ctype"
+  avg.obj <- AverageExpression(obj, return.seurat=T, assays=assay)
+  avg.dat <- GetAssayData(avg.obj, "data") %>% as.matrix
+
+  avg.dat[is.na(avg.dat)] <- 0
+
+  avg.scaled <- t(scale(t(avg.dat)))
+  avg.scaled <- na.omit(avg.scaled)
+
+  cellmarkers <- unique(unlist(lapply(colnames(avg.scaled),
+                                      function(x) {strsplit(x, "_")[[1]][2]})))
+  names(cellmarkers) <- cellmarkers
+
+  return(list(scaleddat=avg.scaled, dat=avg.dat, cellmarkers=cellmarkers))
 }

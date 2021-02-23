@@ -189,7 +189,6 @@ calculateCommGlasso <- function(S, x, netlist, lambda.max = 0.9,
     S <- cor(x)
   }
 
-
   allLRpairs <- c(lr$combo1, lr$combo2)
   filtallLRpairs <- setdiff(allLRpairs, additional)
 
