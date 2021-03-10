@@ -1,3 +1,9 @@
+if (!(requireNamespace("org.Hs.eg.db", quietly = TRUE))) {
+  BiocManager::install("org.Hs.eg.db")
+}
+if (!(requireNamespace("clusterProfiler", quietly = TRUE))) {
+  BiocManager::install("clusterProfiler")
+
 require(tidyverse)
 require(glasso)
 require(igraph)
@@ -10,6 +16,7 @@ require(networkD3)
 require(org.Hs.eg.db)
 require(msigdbr)
 require(dplyr)
+
 
 
 #' Clean the data
