@@ -12,8 +12,12 @@ install.packages(
 	'preprocessCore'
 	'viridis'
 	'networkD3'
-	'BiocManager'
   )
 )
 
-BiocManager::install(c('org.Hs.eg.db','msigdbr', 'clusterProfiler'))
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("org.Hs.eg.db")
+BiocManager::install("clusterProfiler")
+BiocManager::install("msigdbr")

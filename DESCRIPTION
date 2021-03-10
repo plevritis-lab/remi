@@ -25,11 +25,10 @@ Imports:
     circlize,
     magrittr,
     dplyr,
-    Seurat,
+    BiocManager,
     viridis,
-    clusterProfiler,
     networkD3,
-    org.Hs.eg.db,
+    Seurat,
     msigdbr
 Depends:
     R (>= 2.10)
