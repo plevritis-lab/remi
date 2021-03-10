@@ -16,7 +16,7 @@ require(networkD3)
 require(org.Hs.eg.db)
 require(msigdbr)
 require(dplyr)
-
+require(Seurat)
 
 
 #' Clean the data
