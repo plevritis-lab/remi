@@ -9,5 +9,11 @@ install.packages(
     'OneR', 
     'Matrix', 
     'circlize'
+    'preprocessCore'
+    'viridis'
+    'clusterProfiler'
+    'networkD3'
+    'org.Hs.eg.db',
+    'msigdbr'
   )
 )
