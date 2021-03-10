@@ -8,9 +8,9 @@ vignette: >
 ---
 
 ```{r setup}
-devtools::load_all()
+# devtools::load_all()
 library(remi)
-data("pathway.genes", "curr.lr.filt")
+
 ```
 
 Reading in dataset: 
@@ -29,7 +29,7 @@ Set up data for remi
 ```{r}
 celltypes <- c("I", "E", "F", "M")
 cellexp.list <- setupData(adeno.data, celltypes, 5, filter=T)
-remi.interactome <- remi(celltypes, cellexp.list, seed=25)
+remi.interactome <- remi(celltypes, cellexp.list, seed=25, cd = "Louvain")
 ```
 
 Visualize interactome players 

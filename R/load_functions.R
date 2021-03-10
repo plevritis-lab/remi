@@ -1,3 +1,16 @@
+library(tidyverse)
+library(glasso)
+library(igraph)
+library(data.table)
+library(OneR)
+library(preprocessCore)
+library(viridis)
+library(clusterProfiler)
+library(networkD3)
+library(org.Hs.eg.db)
+library(msigdbr)
+library(dplyr)
+
 #' Clean the data
 #'
 #' This function loads a file as a matrix,
@@ -499,13 +512,13 @@ cleaningOutput <- function(input, netlist) {
   }
 
   within.edges <- net.edges %>%
-    filter(commnum %in% within.comms)
+    dplyr::filter(commnum %in% within.comms)
 
   between.edges <- net.edges %>%
-    filter(commnum %in% between.comms)
+    dplyr::filter(commnum %in% between.comms)
 
   between.edges <- between.edges %>%
-    filter(!(pairname %in% within.edges$pairname))
+    dplyr::filter(!(pairname %in% within.edges$pairname))
 
   net.edges.filt <- bind_rows(within.edges, between.edges)
 

@@ -8,8 +8,7 @@ Reading in required libraries
 Reading in code and databases
 ```{r setup, include=FALSE}
 # Loading packages
-library(remi);
-devtools::load_all()
+library(remi)
 ```
 
 Input file is a log-transformed bulk flow-sorted RNA-sequencing dataset

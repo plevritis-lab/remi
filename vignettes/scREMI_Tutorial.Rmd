@@ -8,11 +8,9 @@ library(remi)
 if (!(requireNamespace("org.Hs.eg.db", quietly = TRUE))) {
   BiocManager::install("org.Hs.eg.db")
 }
-```
-
-Load cabernet R package
-```{r}
-devtools::load_all()
+if (!(requireNamespace("clusterProfiler", quietly = TRUE))) {
+  BiocManager::install("clusterProfiler")
+}
 ```
 
 Read in HNSCC scRNA-seq atlas, rename cell types for consistency
@@ -58,7 +56,7 @@ SingleToBulk <- function(obj, assay) {
 
 Determine whether or not all cell-types are present across all samples
 ```{r}
-setupSingleCell <- function(obj, celltype.col, remove.markers, gene.select = NULL, 
+setupSingleCell <- function(obj, celltype.col, remove.markers=c(), gene.select = NULL, 
                             assay="integrated", filter=T, thres=0) {
   pseudobulk <- SingleToBulk(obj, assay) 
   
