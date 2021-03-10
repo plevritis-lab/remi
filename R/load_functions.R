@@ -1,15 +1,16 @@
-library(tidyverse)
-library(glasso)
-library(igraph)
-library(data.table)
-library(OneR)
-library(preprocessCore)
-library(viridis)
-library(clusterProfiler)
-library(networkD3)
-library(org.Hs.eg.db)
-library(msigdbr)
-library(dplyr)
+require(tidyverse)
+require(glasso)
+require(igraph)
+require(data.table)
+require(OneR)
+require(preprocessCore)
+require(viridis)
+require(clusterProfiler)
+require(networkD3)
+require(org.Hs.eg.db)
+require(msigdbr)
+require(dplyr)
+
 
 #' Clean the data
 #'
