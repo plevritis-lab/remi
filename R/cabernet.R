@@ -5,6 +5,8 @@
 system.file("extdata", "curatedLRpairs.tsv", package="remi")
 data("g.biogrid", package="remi")
 data("pathway.genelist", package="remi")
+data("pathway.genes", package = "remi")
+data("curr.lr.filt", package = "remi")
 
 #' Clean the data
 #'

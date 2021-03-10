@@ -10,6 +10,7 @@ vignette: >
 ```{r setup}
 devtools::load_all()
 library(remi)
+data("pathway.genes", "curr.lr.filt")
 ```
 
 Reading in dataset: 
