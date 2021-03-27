@@ -43,8 +43,6 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
 
   allpresent.cols <- names(which(table(colsvec) == length(cellmarkers)))
 
-  print("here")
-
   #filtering non-filtered data
   for(c in names(notfiltered.cellexps)) {
     allpresent.filt.data <- notfiltered.cellexps[[c]][,allpresent.cols]
@@ -78,8 +76,6 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
 }
 
 
-
-
 #' Generating cell type-specific ligand receptor pair network
 #'
 #' Network used for cabernet algorithm. Nodes represent ligand and receptor genes from
@@ -106,6 +102,7 @@ expandLRpairs <- function(lr.table, datlist, celltypes) {
   allcellexp <- datlist[[names(datlist)[1]]]
   if(length(names(datlist)) > 1) {
     for(c in names(datlist)[2:length(datlist)]) {
+      if(nrow(datlist[[c]]) == 0) {cat("No genes in ", c)}
       allcellexp <- rbind(allcellexp, datlist[[c]])
     }
   }
@@ -184,9 +181,17 @@ calculateCor <- function(lr.obj, randomize=F, l.chosen=NULL, r.chosen=NULL, T_st
   lr.table <- lr.obj$lr.network.pairs
 
   lr.genes <- unique(c(lr.table$L, lr.table$R))
+
+  print(lr.genes)
+
   lr.allcellexp <- allcellexp[which(rownames(allcellexp) %in% lr.genes),]
 
+  View(allcellexp)
+
   pairwise.lr <- matrix(NA, nrow=nrow(lr.table), ncol=3)
+
+  View(t(lr.allcellexp))
+  print("hi")
 
   lr.cor <- cor(t(lr.allcellexp))
 
@@ -558,6 +563,9 @@ remi <- function(cellmarkers, dat.list, seed=30,
   pathwaygenes <- unique(unlist(pathway.genelist$genesets))
   netlist <- generateLRnet(lr.database, cellmarkers,
                            dat.list$filtered, downstreamgenes)
+
+  return(netlist)
+
   # Cluster
   cat("Detecting communities")
   commdetect.output <- remifiedCommunities(netlist$net, dat.list$filtered,
@@ -828,11 +836,13 @@ calculateSignificance <- function(obj,
 #' @return Single cell REMI object that can be used by the algorithm
 #' @export
 #'
-#'
-#'
-setupSingleCell <- function(obj, celltype.col, remove.markers, gene.select = NULL,
+setupSingleCell <- function(obj, sample.col,
+                            celltype.col,
+                            remove.markers = c(""),
+                            gene.select = NULL,
                             assay="integrated", filter=T, thres=0) {
-  pseudobulk <- SingleToBulk(obj, assay)
+
+  pseudobulk <- SingleToBulk(obj, assay, sample.col, celltype.col)
 
   num.markers <- length(pseudobulk$cellmarkers) - length(remove.markers)
 
@@ -840,8 +850,11 @@ setupSingleCell <- function(obj, celltype.col, remove.markers, gene.select = NUL
   notfiltered.cellexps <- list()
 
   colsvec <- c()
+
   for(i in 1:length(pseudobulk$cellmarkers)) {
+
     curr.name <- pseudobulk$cellmarkers[i]
+
     if(!(curr.name %in% remove.markers)) {
 
       nospace.name <- as.character(gsub(" ", "", curr.name))
@@ -856,14 +869,18 @@ setupSingleCell <- function(obj, celltype.col, remove.markers, gene.select = NUL
       # Match sample name
       dat.cols <- unlist(lapply(colnames(celltype.filt),
                                 function(x) {strsplit(x, "_")[[1]][1]}))
-
       colsvec <- c(colsvec, dat.cols)
 
       # Removing genes with low expression
       removegenes <- rownames(celltype.filt)[which(rowMeans(celltype.filt) <= thres)]
 
       # Finalized cleaned data matrix
-      cleaned.filt <- pseudobulk$scaleddat[-which(rownames(pseudobulk$scaleddat) %in% removegenes),cell.cols]
+      if(length(removegenes) > 0) {
+        cleaned.filt <- pseudobulk$scaleddat[-which(rownames(pseudobulk$scaleddat) %in%
+                                                      removegenes), cell.cols]
+      } else {
+        cleaned.filt <- pseudobulk$scaleddat[,cell.cols]
+      }
 
       # Adding in cell type into rownames
       rownames(celltype.filt) <- paste0(curr.name, "_", rownames(celltype.filt))
@@ -873,12 +890,14 @@ setupSingleCell <- function(obj, celltype.col, remove.markers, gene.select = NUL
       colnames(cleaned.filt) <- dat.cols
 
       if(is.null(gene.select)) {
-        print(dim(cleaned.filt))
         filtered.cellexps[[curr.name]] <- cleaned.filt
         notfiltered.cellexps[[curr.name]] <- celltype.filt
       } else {
-        filtered.cellexps[[curr.name]] <- cleaned.filt[which(rownames(cleaned.filt) %in% gene.select),]
-        notfiltered.cellexps[[curr.name]] <- celltype.filt[which(rownames(celltype.filt) %in% gene.select),]
+        filtered.cellexps[[curr.name]] <- cleaned.filt[which(rownames(cleaned.filt) %in%
+                                                               gene.select),]
+        notfiltered.cellexps[[curr.name]] <- celltype.filt[which(rownames(celltype.filt) %in%
+                                                                   gene.select),]
+
       }
     }
   }
@@ -887,10 +906,13 @@ setupSingleCell <- function(obj, celltype.col, remove.markers, gene.select = NUL
 
   #Filtering non-filtered data
   for(c in names(notfiltered.cellexps)) {
-    allpresent.filt.data <- notfiltered.cellexps[[c]][,which(colnames(notfiltered.cellexps[[c]]) %in% allpresent.cols)]
+
+    allpresent.filt.data <- notfiltered.cellexps[[c]][,which(colnames(notfiltered.cellexps[[c]]) %in%
+                                                              allpresent.cols)]
 
     duplicate.cols <- which(apply(allpresent.filt.data, 1,
                                   function(x) length(unique(x))==1) == TRUE)
+
     if(length(duplicate.cols) > 0) {
       notfiltered.cellexps[[c]] <- allpresent.filt.data[-duplicate.cols,]
     } else {
@@ -902,7 +924,8 @@ setupSingleCell <- function(obj, celltype.col, remove.markers, gene.select = NUL
   for(c in names(filtered.cellexps)) {
     allpresent.filt.data <- filtered.cellexps[[c]][,allpresent.cols]
     duplicate.cols <- which(apply(allpresent.filt.data, 1,
-                                  function(x) length(unique(x))==1) == TRUE)
+                                  function(x) length(unique(x)) == 1) == TRUE)
+
     if(length(duplicate.cols) > 0) {
       filtered.cellexps[[c]] <- allpresent.filt.data[-duplicate.cols,]
     } else {
@@ -911,9 +934,13 @@ setupSingleCell <- function(obj, celltype.col, remove.markers, gene.select = NUL
   }
 
   if(filter == F) {
-    return(list(filtered=notfiltered.cellexps, unfiltered=notfiltered.cellexps, cellmarkers=pseudobulk$cellmarkers))
+    return(list(filtered=notfiltered.cellexps,
+                unfiltered=notfiltered.cellexps,
+                cellmarkers=pseudobulk$cellmarkers))
   } else {
-    return(list(filtered=filtered.cellexps, unfiltered=notfiltered.cellexps, cellmarkers=pseudobulk$cellmarkers))
+    return(list(filtered=filtered.cellexps,
+                unfiltered=notfiltered.cellexps,
+                cellmarkers=pseudobulk$cellmarkers))
   }
 }
 
@@ -925,12 +952,12 @@ setupSingleCell <- function(obj, celltype.col, remove.markers, gene.select = NUL
 #' @return Average expressiona cross patients
 #' @export
 #'
-#'
-#'
-SingleToBulk <- function(obj, assay) {
+SingleToBulk <- function(obj, assay, samplecol, celltypecol) {
   temp.rownames <- rownames(obj@meta.data)
   obj@meta.data <- obj@meta.data %>%
-    mutate(group.ctype = paste0(sample, "_" , cell_type))
+    mutate(samplesREMI = gsub("_", "", !!as.name(samplecol))) %>%
+    mutate(group.ctype = paste0(samplesREMI, "_" , !!as.name(celltypecol))) %>%
+    mutate(group.ctype = as.factor(group.ctype))
   rownames(obj@meta.data) <- temp.rownames
 
   Idents(obj) <- "group.ctype"
