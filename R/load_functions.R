@@ -203,16 +203,9 @@ calculateCor <- function(lr.obj, randomize=F, l.chosen=NULL, r.chosen=NULL, T_st
 
   lr.genes <- unique(c(lr.table$L, lr.table$R))
 
-  print(lr.genes)
-
   lr.allcellexp <- allcellexp[which(rownames(allcellexp) %in% lr.genes),]
 
-  View(allcellexp)
-
   pairwise.lr <- matrix(NA, nrow=nrow(lr.table), ncol=3)
-
-  View(t(lr.allcellexp))
-  print("hi")
 
   lr.cor <- cor(t(lr.allcellexp))
 
@@ -584,8 +577,6 @@ remi <- function(cellmarkers, dat.list, seed=30,
   pathwaygenes <- unique(unlist(pathway.genelist$genesets))
   netlist <- generateLRnet(lr.database, cellmarkers,
                            dat.list$filtered, downstreamgenes)
-
-  return(netlist)
 
   # Cluster
   cat("Detecting communities")
