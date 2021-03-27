@@ -5,6 +5,8 @@
 system.file("extdata", "curatedLRpairs.tsv", package="remi")
 data("g.biogrid", package="remi")
 data("pathway.genelist", package="remi")
+data("pathway.genes", package = "remi")
+data("curr.lr.filt", package = "remi")
 
 #' Clean the data
 #'
@@ -290,6 +292,11 @@ cabernetCommunities <- function(net, dat.list, lnodes, seed) {
   lr.communities <- c()
 
   # Clustering using label propagation to seed out important receptors
+  cat(class(net))
+  cat(class(clu))
+  class(labeled.comm.names)
+  class(lnodes)
+
   labelprop.comms <- clusterLabelProp(net, clu, labeled.comm.names, lnodes)
 
   if(length(unique(labelprop.comms)) == 1) {

@@ -4,25 +4,18 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-libs <- c("qgraph", "data.table", "igraph", "glasso", "tidyverse",
-          "OneR", "Matrix", "circlize", "Seurat")
-lapply(libs, library, character.only=TRUE)
-```
-
-Load cabernet R package
-```{r}
-#Loading remi package and datasets
-source("load_functions.R")
-source("load_subfunctions.R")
-load("curr.lr.filt.rda")
-load("g.biogrid.rda")
-load("pathway.genelist.rda")
-load("pathway.genes.rda")
+library(remi)
+if (!(requireNamespace("org.Hs.eg.db", quietly = TRUE))) {
+  BiocManager::install("org.Hs.eg.db")
+}
+if (!(requireNamespace("clusterProfiler", quietly = TRUE))) {
+  BiocManager::install("clusterProfiler")
+}
 ```
 
 Read in HNSCC scRNA-seq atlas, rename cell types for consistency
 ```{r}
-HNSCC <- readRDS("HNSCC_atlas-scRNA-seq-CITE-seq.rds")
+HNSCC <- readRDS("~/Projects/rotation_remi/data/test/scRNA/HNSCC_subpopulationclusters.rds")
 
 HNSCC.metadata <- data.frame(HNSCC@meta.data, stringsAsFactors = F)
 HNSCC.metadata$cell_subset <- gsub("Malignant cells", "Malignant", HNSCC.metadata$cell_subset)
@@ -63,7 +56,7 @@ SingleToBulk <- function(obj, assay) {
 
 Determine whether or not all cell-types are present across all samples
 ```{r}
-setupSingleCell <- function(obj, celltype.col, remove.markers, gene.select = NULL, 
+setupSingleCell <- function(obj, celltype.col, remove.markers=c(), gene.select = NULL, 
                             assay="integrated", filter=T, thres=0) {
   pseudobulk <- SingleToBulk(obj, assay) 
   

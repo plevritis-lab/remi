@@ -6,11 +6,12 @@ output: html_document
 ```{r setup, include=FALSE}
 devtools::load_all()
 library(remi)
+
 ```
 
 Reading in HNSCC dataset
 ```{r}
-HNSCC <- readRDS("/Users/ayu1/Documents/U54_Human/HNSCC_atlas-scRNA-seq-CITE-seq.rds")
+HNSCC <- readRDS("~/Projects/rotation_remi/data/test/scRNA/HNSCC_subpopulationclusters.rds")
 ```
 
 Pulling out PCs

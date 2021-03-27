@@ -1,3 +1,24 @@
+if (!(requireNamespace("org.Hs.eg.db", quietly = TRUE))) {
+  BiocManager::install("org.Hs.eg.db")
+}
+if (!(requireNamespace("clusterProfiler", quietly = TRUE))) {
+  BiocManager::install("clusterProfiler")
+}
+require(tidyverse)
+require(glasso)
+require(igraph)
+require(data.table)
+require(OneR)
+require(preprocessCore)
+require(viridis)
+require(clusterProfiler)
+require(networkD3)
+require(org.Hs.eg.db)
+require(msigdbr)
+require(dplyr)
+require(Seurat)
+
+
 #' Clean the data
 #'
 #' This function loads a file as a matrix,
@@ -518,13 +539,13 @@ cleaningOutput <- function(input, netlist) {
   }
 
   within.edges <- net.edges %>%
-    filter(commnum %in% within.comms)
+    dplyr::filter(commnum %in% within.comms)
 
   between.edges <- net.edges %>%
-    filter(commnum %in% between.comms)
+    dplyr::filter(commnum %in% between.comms)
 
   between.edges <- between.edges %>%
-    filter(!(pairname %in% within.edges$pairname))
+    dplyr::filter(!(pairname %in% within.edges$pairname))
 
   net.edges.filt <- bind_rows(within.edges, between.edges)
 

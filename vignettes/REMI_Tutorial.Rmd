@@ -8,16 +8,7 @@ Reading in required libraries
 Reading in code and databases
 ```{r setup, include=FALSE}
 # Loading packages
-library(remi); library(tidyverse); library(glasso); library(igraph); library(data.table);
-library(OneR); library(preprocessCore); library(viridis); 
-library(clusterProfiler); library(networkD3); library(org.Hs.eg.db);
-library(msigdbr);
-
-#Loading remi package and datasets
-data("curr.lr.filt", package = "remi")
-data("g.biogrid", package = "remi")
-data("pathway.genelist", package = "remi")
-data("pathway.genes", package="remi")
+library(remi)
 ```
 
 Input file is a log-transformed bulk flow-sorted RNA-sequencing dataset
@@ -45,10 +36,6 @@ cellexp.list <- setupData(dat, celltypes, 4, filter=T)
 adeno.remi <- remi(celltypes, cellexp.list, cd="Louvain",
                    maxNum = ncol(cellexp.list$filtered$I))
 ```
-
-Final outputs: 
-adeno.remi$interactome = final interactome
-adeno.remi$wholeinteractome = all the edges
 
 
 
