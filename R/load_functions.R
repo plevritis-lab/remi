@@ -850,7 +850,7 @@ calculateSignificance <- function(obj,
 #'
 setupSingleCell <- function(obj, sample.col,
                             celltype.col,
-                            remove.markers = c(""),
+                            remove.markers = NULL,
                             gene.select = NULL,
                             assay="integrated", filter=T, thres=0) {
 
