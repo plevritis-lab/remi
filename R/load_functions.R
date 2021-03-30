@@ -507,11 +507,11 @@ cleaningOutput <- function(input, netlist) {
   strsplit.ind2 <- seq(from=2, by=2, length.out = nrow(input))
 
   net.edges <- data.table::data.table(switched.W) %>%
-    dplyr::mutate(n1cell = unlist(strsplit(node1, split="_"))[strsplit.ind]) %>%
-    dplyr::mutate(n2cell = unlist(strsplit(node2, split="_"))[strsplit.ind]) %>%
+    dplyr::mutate(ligandcell = unlist(strsplit(node1, split="_"))[strsplit.ind]) %>%
+    dplyr::mutate(receptorcell = unlist(strsplit(node2, split="_"))[strsplit.ind]) %>%
     dplyr::mutate(ligand = unlist(strsplit(node1, split="_"))[strsplit.ind2]) %>%
     dplyr::mutate(receptor = unlist(strsplit(node2, split="_"))[strsplit.ind2]) %>%
-    dplyr::select(node1, node2, ligand, receptor, n1cell, n2cell,
+    dplyr::select(node1, node2, ligand, receptor, ligandcell, receptorcell,
                   weight, cor, commsize, commnum, deg, numgenes, lambda) %>%
     dplyr::mutate(pairname = paste0(node1, "_", node2)) %>%
     dplyr::filter(pairname %in% netlist$mat$combo1) %>%
