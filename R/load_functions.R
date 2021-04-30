@@ -325,7 +325,7 @@ remifiedCommunities <- function(net, dat.list,
   lr.communities <- c()
 
   if(cd == "Louvain") {
-    density.comms <- membership(cluster_louvain(net))
+      density.comms <- igraph::membership(cluster_louvain(net))
   }
 
   # Calculate degree of each network and check how many are
