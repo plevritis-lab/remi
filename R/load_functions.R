@@ -620,7 +620,7 @@ remi <- function(cellmarkers, dat.list, seed=30,
 #' Making chord diagram for REMI results
 #'
 #'
-#' @param  interactome Predicted interactome
+#' @param interactome Predicted interactome
 #' @param grid.col Optional: color option for cell type
 #' @return Chord Diagram highlighting proportion of cell-types in interactome
 #' @export
@@ -693,7 +693,7 @@ REMIPlot <- function(interactome, type="chord",
 #' Calculating p-value for a given edge in a community
 #'
 #'
-#' @param  obj REMI object
+#' @param obj REMI object
 #' @param l.chosen Ligand in edge
 #' @param r.chosen Receptor in edge
 #' @param comm.chosen Community that edge is present in
@@ -702,9 +702,6 @@ REMIPlot <- function(interactome, type="chord",
 #' @param lambda = Manually setting lambda if of interest
 #' @return Chord Diagram highlighting proportion of cell-types in interactome
 #' @export
-#'
-#'
-#'
 #'
 calculateSignificance <- function(obj,
                                   l.chosen,
@@ -846,7 +843,7 @@ calculateSignificance <- function(obj,
 #' Creating single cell REMI object
 #'
 #'
-#' @param  obj REMI object
+#' @param obj REMI object
 #' @param celltype.col what cell types to measure
 #' @param remove.markers cell types that should not be used for calculations
 #' @param gene.selct genes of interest
