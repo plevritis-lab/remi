@@ -63,7 +63,7 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
   }
 
   allpresent.cols <- names(which(table(colsvec) == length(cellmarkers)))
-
+  
   #filtering non-filtered data
   for(c in names(notfiltered.cellexps)) {
     allpresent.filt.data <- notfiltered.cellexps[[c]][,allpresent.cols]
@@ -95,7 +95,6 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
                 unfiltered=notfiltered.cellexps))
   }
 }
-
 
 #' Generating cell type-specific ligand receptor pair network
 #'
@@ -334,7 +333,7 @@ remifiedCommunities <- function(net, dat.list,
                                            density.comms,
                                            dat.list[[1]],
                                            maxNum = maxNum)
-
+  
   # Iterate through all the communities until their
   # degrees match the sample size
   old.comms <- density.comms
@@ -507,11 +506,11 @@ cleaningOutput <- function(input, netlist) {
   strsplit.ind2 <- seq(from=2, by=2, length.out = nrow(input))
 
   net.edges <- data.table::data.table(switched.W) %>%
-    dplyr::mutate(ligandcell = unlist(strsplit(node1, split="_"))[strsplit.ind]) %>%
-    dplyr::mutate(receptorcell = unlist(strsplit(node2, split="_"))[strsplit.ind]) %>%
+    dplyr::mutate(n1cell = unlist(strsplit(node1, split="_"))[strsplit.ind]) %>%
+    dplyr::mutate(n2cell = unlist(strsplit(node2, split="_"))[strsplit.ind]) %>%
     dplyr::mutate(ligand = unlist(strsplit(node1, split="_"))[strsplit.ind2]) %>%
     dplyr::mutate(receptor = unlist(strsplit(node2, split="_"))[strsplit.ind2]) %>%
-    dplyr::select(node1, node2, ligand, receptor, ligandcell, receptorcell,
+    dplyr::select(node1, node2, ligand, receptor, n1cell, n2cell,
                   weight, cor, commsize, commnum, deg, numgenes, lambda) %>%
     dplyr::mutate(pairname = paste0(node1, "_", node2)) %>%
     dplyr::filter(pairname %in% netlist$mat$combo1) %>%
@@ -580,7 +579,8 @@ remi <- function(cellmarkers, dat.list, seed=30,
 
   # Cluster
   cat("Detecting communities")
-  commdetect.output <- remifiedCommunities(netlist$net, dat.list$filtered,
+  commdetect.output <- remifiedCommunities(netlist$net,
+                                           dat.list$filtered,
                                            seed=seed,
                                            cd=cd,
                                            maxNum = maxNum)
@@ -625,15 +625,25 @@ remi <- function(cellmarkers, dat.list, seed=30,
 #' @return Chord Diagram highlighting proportion of cell-types in interactome
 #' @export
 #'
-REMIPlot <- function(interactome, type="Sankey", grid.col=NULL, size=10) {
+REMIPlot <- function(interactome, type="chord",
+                     grid.col=NULL, size=10, thres=0,
+                     selectcell = NULL,
+                     legend = FALSE) {
+  
   chord.format <- interactome$interactome %>%
+    filter(weight > thres) %>%
     dplyr::mutate(node1 = paste0(n1cell, "_", ligand)) %>%
     dplyr::mutate(node2 = paste0(n2cell, "_", receptor))
-
+  
+  if(!(is.null(selectcell))) {
+    chord.format <- chord.format %>%
+      filter(n1cell == selectcell | n2cell == selectcell)
+  }
+  
   chord.sigmaxedges <- chord.format %>%
     dplyr::select(node1, node2, n1cell, n2cell) %>%
     unique()
-
+  
   strsplit.ind <- seq(from=1, by=2, length.out = nrow(chord.sigmaxedges))
   adeno.lr <- chord.sigmaxedges %>%
     dplyr::mutate(celltypes = paste0(n1cell, "_", n2cell)) %>%
@@ -651,15 +661,17 @@ REMIPlot <- function(interactome, type="Sankey", grid.col=NULL, size=10) {
   if(type == "chord") {
     circlize::chordDiagram(df2,
                            grid.col=grid.col,
-                           #directional=1,
-                           #direction.type = c("diffHeight", "arrows"),
+                           directional=1,
+                           direction.type = c("diffHeight"),
                            annotationTrack = c("grid"), link.lwd = lwd_mat)
 
-    legend("right",
-           legend = names(grid.col),
-           fill = grid.col,
-           border=NA,
-           bty="n")
+    if(legend == TRUE) {
+      legend("right",
+             legend = names(grid.col),
+             fill = grid.col,
+             border=NA,
+             bty="n")
+    }
   }
 
   if(type == "alluvial") {
@@ -760,7 +772,7 @@ calculateSignificance <- function(obj,
     T_star = 2 * runif(1) - 1 # a uniform value in [-1,1]
 
     R_star_cor_df <- calculateCor(list(expanddata=allcellexp,
-                                       lr.network.pairs=adeno.remi$lrnet$mat),
+                                       lr.network.pairs=obj$lrnet$mat),
                                   randomize=T,
                                   l.chosen=l.chosen,
                                   r.chosen=r.chosen,
@@ -804,14 +816,10 @@ calculateSignificance <- function(obj,
     comm.cor <- R_star_cor_df$lr.cor[which(rownames(R_star_cor_df$lr.cor) %in% lr.boot.genes),
                                      which(colnames(R_star_cor_df$lr.cor) %in% lr.boot.genes)]
 
-    View(comm.cor)
-
     g <- calculateCommGlasso(comm.cor, comm.mat, obj$lrnet,
                              lambda=opt.lambda,
                              scale=F)$W %>%
       mutate(weight = if_else(abs(as.numeric(weight)) > 0, 1, 0))
-
-    #View(g)
 
     node.ind <- which(g$node1 == l.chosen & g$node2 == r.chosen)
     if(length(node.ind) == 0) {
@@ -852,11 +860,25 @@ setupSingleCell <- function(obj, sample.col,
                             celltype.col,
                             remove.markers = NULL,
                             gene.select = NULL,
-                            assay="integrated", filter=T, thres=0) {
+                            assay="integrated",
+                            filter=T,
+                            thres=0,
+                            expthres = 0.1) {
 
+  cat("Calculating percent expressed for ligand and receptor genes\n")
+  
+  Idents(obj) <- celltype.col
+  d <- DotPlot(obj, features=rownames(obj))
+  percexp <- d$data %>%
+    filter(pct.exp > expthres) %>%
+    mutate(cell_gene = paste0(id, "_", features.plot))
+  
+  cat("Averaging expression\n")
+  
   pseudobulk <- SingleToBulk(obj, assay, sample.col, celltype.col)
 
   num.markers <- length(pseudobulk$cellmarkers) - length(remove.markers)
+  print(num.markers)
 
   filtered.cellexps <- list()
   notfiltered.cellexps <- list()
@@ -875,7 +897,8 @@ setupSingleCell <- function(obj, sample.col,
                                 function(x) {strsplit(x, "_")[[1]][2]}))
       all.cols <- gsub(" ", "", all.cols)
 
-      cell.cols <- grep(paste0("\\b", nospace.name, "\\b"), all.cols)
+      cell.cols <- grep(paste0("^\\b", nospace.name, "\\b$"), all.cols)
+      
       celltype.filt <- pseudobulk$dat[,cell.cols]
 
       # Match sample name
@@ -900,6 +923,8 @@ setupSingleCell <- function(obj, sample.col,
 
       rownames(cleaned.filt) <- paste0(curr.name, "_", rownames(cleaned.filt))
       colnames(cleaned.filt) <- dat.cols
+      
+      cleaned.filt <- cleaned.filt[which(rownames(cleaned.filt) %in% percexp$cell_gene),]
 
       if(is.null(gene.select)) {
         filtered.cellexps[[curr.name]] <- cleaned.filt
@@ -913,46 +938,62 @@ setupSingleCell <- function(obj, sample.col,
       }
     }
   }
-
+  
   allpresent.cols <- names(which(table(colsvec) == num.markers))
-
+  
+  if(length(allpresent.cols) == 1) {
+    cat("Please remove cell types. Only one patient with all cell types\n")
+    stop
+  }
+  
   #Filtering non-filtered data
   for(c in names(notfiltered.cellexps)) {
-
+    
     allpresent.filt.data <- notfiltered.cellexps[[c]][,which(colnames(notfiltered.cellexps[[c]]) %in%
                                                               allpresent.cols)]
-
-    duplicate.cols <- which(apply(allpresent.filt.data, 1,
-                                  function(x) length(unique(x))==1) == TRUE)
-
-    if(length(duplicate.cols) > 0) {
-      notfiltered.cellexps[[c]] <- allpresent.filt.data[-duplicate.cols,]
+    
+    if(is.null(nrow(allpresent.filt.data))) {
+      cat(c, " was omitted due to lack of uniform expression.\n")
     } else {
-      notfiltered.cellexps[[c]] <- allpresent.filt.data
+    
+      duplicate.cols <- which(apply(allpresent.filt.data, 1,
+                                    function(x) length(unique(x))==1) == TRUE)
+  
+      if(length(duplicate.cols) > 0) {
+        notfiltered.cellexps[[c]] <- allpresent.filt.data[-duplicate.cols,]
+      } else {
+        notfiltered.cellexps[[c]] <- allpresent.filt.data
+      }
     }
   }
-
+  
   # Only using samples that have all the cell types of interest
   for(c in names(filtered.cellexps)) {
-    allpresent.filt.data <- filtered.cellexps[[c]][,allpresent.cols]
-    duplicate.cols <- which(apply(allpresent.filt.data, 1,
-                                  function(x) length(unique(x)) == 1) == TRUE)
-
-    if(length(duplicate.cols) > 0) {
-      filtered.cellexps[[c]] <- allpresent.filt.data[-duplicate.cols,]
+    allpresent.filt.data <- filtered.cellexps[[c]][,which(colnames(filtered.cellexps[[c]]) %in%
+                                                            allpresent.cols)]
+    
+    if(is.null(nrow(allpresent.filt.data))) {
+      temp <- "hi"
     } else {
-      filtered.cellexps[[c]] <- allpresent.filt.data
+      duplicate.cols <- which(apply(allpresent.filt.data, 1,
+                                    function(x) length(unique(x)) == 1) == TRUE)
+  
+      if(length(duplicate.cols) > 0) {
+        filtered.cellexps[[c]] <- allpresent.filt.data[-duplicate.cols,]
+      } else {
+        filtered.cellexps[[c]] <- allpresent.filt.data
+      }
     }
   }
 
   if(filter == F) {
     return(list(filtered=notfiltered.cellexps,
                 unfiltered=notfiltered.cellexps,
-                cellmarkers=pseudobulk$cellmarkers))
+                cellmarkers=setdiff(pseudobulk$cellmarkers, remove.markers)))
   } else {
     return(list(filtered=filtered.cellexps,
                 unfiltered=notfiltered.cellexps,
-                cellmarkers=pseudobulk$cellmarkers))
+                cellmarkers=setdiff(pseudobulk$cellmarkers, remove.markers)))
   }
 }
 
@@ -974,8 +1015,9 @@ SingleToBulk <- function(obj, assay, samplecol, celltypecol) {
 
   Idents(obj) <- "group.ctype"
   avg.obj <- AverageExpression(obj, return.seurat=T, assays=assay)
+  
   avg.dat <- GetAssayData(avg.obj, "data") %>% as.matrix
-
+  
   avg.dat[is.na(avg.dat)] <- 0
 
   avg.scaled <- t(scale(t(avg.dat)))
@@ -987,3 +1029,4 @@ SingleToBulk <- function(obj, assay, samplecol, celltypecol) {
 
   return(list(scaleddat=avg.scaled, dat=avg.dat, cellmarkers=cellmarkers))
 }
+

@@ -115,11 +115,21 @@ clusterLabelProp <- function(net, clu, clu.labeled, labelednodes) {
 #' @return Clusters identified using louvain combined with all communities
 #'
 clusterLouvain <- function(net, commnums, communities) {
-  final.comms <- communities[-which(communities %in% commnums)]
+  suppressWarnings(
+  if(unique(commnums) == unique(communities)) {
+    print("All communities are larger than sample size")
+    final.comms <- NA
+  } else {
+    final.comms <- communities[-which(communities %in% commnums)]
+  })
   for(cc in commnums) {
     comm.net <- igraph::induced_subgraph(net,names(communities[communities==cc]))
     louvain.comms <- igraph::membership(igraph::cluster_louvain(comm.net))
-    final.comms <- c(final.comms, louvain.comms+max(final.comms))
+    if(is.na(final.comms)) {
+      final.comms <- louvain.comms
+    } else {
+      final.comms <- c(final.comms, louvain.comms+max(final.comms))
+    }
   }
   return(final.comms)
 }
@@ -368,3 +378,4 @@ calculatePvalue <- function(R_, S_, D_, i_, j_, n, p) {
 
   return(list(p=twosided_pvalue, w=weights_, w_n=(weights_ * (null_sample > R_[i_, j_]))))
 }
+
