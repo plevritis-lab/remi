@@ -4,6 +4,7 @@ if (!(requireNamespace("org.Hs.eg.db", quietly = TRUE))) {
 if (!(requireNamespace("clusterProfiler", quietly = TRUE))) {
   BiocManager::install("clusterProfiler")
 }
+
 require(tidyverse)
 require(glasso)
 require(igraph)
