@@ -6,8 +6,7 @@ The REMI package is written in R and is designed to predict ligand receptor inte
 
 ## Installation
 
-Install R (>= 3.6)
-Install Rstudio (recommended)
+Install R (>= 3.6) 
 ```
 install.packages("devtools")
 library(devtools)
