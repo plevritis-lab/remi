@@ -816,7 +816,7 @@ calculateSignificance <- function(obj,
     g <- calculateCommGlasso(comm.cor, comm.mat, obj$lrnet,
                              lambda=opt.lambda,
                              scale=F)$W %>%
-      mutate(weight = if_else(abs(as.numeric(weight)) > 0, 1, 0))
+                             dplyr::mutate(weight = if_else(abs(as.numeric(weight)) > 0, 1, 0))
 
     node.ind <- which(g$node1 == l.chosen & g$node2 == r.chosen)
     if(length(node.ind) == 0) {
@@ -868,7 +868,7 @@ setupSingleCell <- function(obj, sample.col,
   d <- Seurat::DotPlot(obj, features=rownames(obj))
   percexp <- d$data %>%
     filter(pct.exp > expthres) %>%
-    mutate(cell_gene = paste0(id, "_", features.plot))
+    dplyr::mutate(cell_gene = paste0(id, "_", features.plot))
   
   cat("Averaging expression\n")
   
@@ -1005,9 +1005,9 @@ setupSingleCell <- function(obj, sample.col,
 SingleToBulk <- function(obj, assay, samplecol, celltypecol) {
   temp.rownames <- rownames(obj@meta.data)
   obj@meta.data <- obj@meta.data %>%
-    mutate(samplesREMI = gsub("_", "", !!as.name(samplecol))) %>%
-    mutate(group.ctype = paste0(samplesREMI, "_" , !!as.name(celltypecol))) %>%
-    mutate(group.ctype = as.factor(group.ctype))
+  dplyr::mutate(samplesREMI = gsub("_", "", !!as.name(samplecol))) %>%
+  dplyr::mutate(group.ctype = paste0(samplesREMI, "_" , !!as.name(celltypecol))) %>%
+  dplyr::mutate(group.ctype = as.factor(group.ctype))
   rownames(obj@meta.data) <- temp.rownames
 
   Idents(obj) <- "group.ctype"
