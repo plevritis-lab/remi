@@ -28,4 +28,4 @@ For usage tutorials, check the `vignettes` directory of the repo.
 
 
 ## Contact
-Email: ayu1@stanford.edu or sylvia.plevritis@stanford.edu
+Email: Alice Yu (ayu1@stanford.edu) or Sylvia Plevritis (sylvia.plevritis@stanford.edu)
