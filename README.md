@@ -18,6 +18,8 @@ install_github("ayu1/remi")
 
 REMI takes in normalized and scaled RNA-sequencing data as an input, where the columns are samples and rows are genes. The column names are labeled as sample_celltype (i.e. S01_Bcell). The package has a built-in option to filter low-expressed genes, but it can also take it any pre-filtered scaled datasets (filter=F). 
 
+**Tutorials:**
+
 [Bulk Flow-Sorted RNA-Seq in R](http://htmlpreview.github.io/?https://github.com/ayu1/remi/blob/master/vignettes/REMI_Tutorial.html)
 
 - Single cell RNA-Seq data in R
@@ -25,9 +27,6 @@ REMI takes in normalized and scaled RNA-sequencing data as an input, where the c
 
 For usage tutorials, check the `vignettes` directory of the repo. 
 
-## Sample Datasets
-
-
 
 ## Contact
-Email: ayu1@stanford.edu
+Email: ayu1@stanford.edu or sylvia.plevritis@stanford.edu
