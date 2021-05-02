@@ -1,0 +1,51 @@
+---
+title: "remi_tutorial.Rmd"
+output: html_document
+author: "Alice Yu"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+The files that are loaded need to be downloaded from the Github
+Reading in required libraries
+Reading in code and databases
+```{r setup, include=FALSE}
+# Loading packages
+library(remi)
+```
+
+Input file is a log-transformed bulk flow-sorted RNA-sequencing dataset
+Data is from Gentles et al. 2020
+https://genomebiology.biomedcentral.com/articles/10.1186/s13059-020-02019-x 
+Column names are labeled as samplename_celltype
+```{r}
+# this should be a dataset that the user can download on their own for the tutorial?
+dat <- read.csv("~/Projects/rotation_remi/data/test/bulk_flowsort/U01Adeno_logged.csv", row.names=1)
+```
+
+Set up data for REMI
+There is a built in filtering step for REMI where users can choose to threshold their genes based on quantiles. The number 4 represents binning the data into four quantiles and removing data with expression levels in the lowest quantile. Filtering can also be turned off (filter = F)
+
+OR users can pre-threshold the genes and turn the filter off, but setupData needs to run in order to make a REMI object for the algorithm
+
+Data must be log-transformed for input, no prior scaling or normalization
+
+```{r}
+# list of cell types user wants to analyze 
+celltypes <- c("I", "E", "F", "M")
+cellexp.list <- setupData(dat, celltypes, 4, filter=T)
+
+# RUNNING REMI
+adeno.remi <- remi(celltypes, cellexp.list, cd="Louvain",
+                   maxNum = ncol(cellexp.list$filtered$I))
+```
+
+
+
+
+
+
+

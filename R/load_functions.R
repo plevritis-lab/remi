@@ -1011,10 +1011,10 @@ SingleToBulk <- function(obj, assay, samplecol, celltypecol) {
   dplyr::mutate(group.ctype = as.factor(group.ctype))
   rownames(obj@meta.data) <- temp.rownames
 
-  Idents(obj) <- "group.ctype"
+  Seurat::Idents(obj) <- "group.ctype"
   avg.obj <- Seurat::AverageExpression(obj, return.seurat=T, assays=assay)
 
-  avg.dat <- GetAssayData(avg.obj, "data") %>% as.matrix
+  avg.dat <- Seurat::GetAssayData(avg.obj, "data") %>% as.matrix
 
   avg.dat[is.na(avg.dat)] <- 0
 
