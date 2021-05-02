@@ -21,7 +21,7 @@ REMI takes in normalized bulk or single-cell RNA-sequencing data as an input, wh
 
 [Bulk Flow-Sorted RNA-Seq in R](http://htmlpreview.github.io/?https://github.com/ayu1/remi/blob/master/vignettes/REMI_Tutorial.html)
 
-[Single cell RNA-Seq data in R](http://htmlpreview.github.io/https://github.com/ayu1/remi/blob/master/vignettes/singleCell_REMITutorial.html)
+[Single cell RNA-Seq data in R](http://htmlpreview.github.io/?https://github.com/ayu1/remi/blob/master/vignettes/singleCell_REMITutorial.html)
 - Python adaption for REMI - *Coming Soon*
 
 For usage tutorials, check the `vignettes` directory of the repo. 
