@@ -64,7 +64,7 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
   }
 
   allpresent.cols <- names(which(table(colsvec) == length(cellmarkers)))
-  
+
   #filtering non-filtered data
   for(c in names(notfiltered.cellexps)) {
     allpresent.filt.data <- notfiltered.cellexps[[c]][,allpresent.cols]
@@ -326,7 +326,7 @@ remifiedCommunities <- function(net, dat.list,
   lr.communities <- c()
 
   if(cd == "Louvain") {
-      density.comms <- igraph::membership(cluster_louvain(net))
+      density.comms <- igraph::membership(igraph::cluster_louvain(net))
   }
 
   # Calculate degree of each network and check how many are
@@ -334,7 +334,7 @@ remifiedCommunities <- function(net, dat.list,
                                            density.comms,
                                            dat.list[[1]],
                                            maxNum = maxNum)
-  
+
   # Iterate through all the communities until their
   # degrees match the sample size
   old.comms <- density.comms
@@ -540,7 +540,7 @@ cleaningOutput <- function(input, netlist) {
   between.edges <- between.edges %>%
     dplyr::filter(!(pairname %in% within.edges$pairname))
 
-  net.edges.filt <- bind_rows(within.edges, between.edges)
+  net.edges.filt <- dplyr::bind_rows(within.edges, between.edges)
 
   filtered.net.edges <- net.edges.filt %>%
     dplyr::filter(abs(as.numeric(weight)) > 0)
@@ -630,21 +630,21 @@ REMIPlot <- function(interactome, type="chord",
                      grid.col=NULL, size=10, thres=0,
                      selectcell = NULL,
                      legend = FALSE) {
-  
+
   chord.format <- interactome$interactome %>%
-    filter(weight > thres) %>%
+    dplyr::filter(weight > thres) %>%
     dplyr::mutate(node1 = paste0(n1cell, "_", ligand)) %>%
     dplyr::mutate(node2 = paste0(n2cell, "_", receptor))
-  
+
   if(!(is.null(selectcell))) {
     chord.format <- chord.format %>%
       filter(n1cell == selectcell | n2cell == selectcell)
   }
-  
+
   chord.sigmaxedges <- chord.format %>%
     dplyr::select(node1, node2, n1cell, n2cell) %>%
     unique()
-  
+
   strsplit.ind <- seq(from=1, by=2, length.out = nrow(chord.sigmaxedges))
   adeno.lr <- chord.sigmaxedges %>%
     dplyr::mutate(celltypes = paste0(n1cell, "_", n2cell)) %>%
@@ -864,15 +864,15 @@ setupSingleCell <- function(obj, sample.col,
                             expthres = 0.1) {
 
   cat("Calculating percent expressed for ligand and receptor genes\n")
-  
+
   Idents(obj) <- celltype.col
   d <- Seurat::DotPlot(obj, features=rownames(obj))
   percexp <- d$data %>%
-    filter(pct.exp > expthres) %>%
+    dplyr::filter(pct.exp > expthres) %>%
     dplyr::mutate(cell_gene = paste0(id, "_", features.plot))
-  
+
   cat("Averaging expression\n")
-  
+
   pseudobulk <- SingleToBulk(obj, assay, sample.col, celltype.col)
 
   num.markers <- length(pseudobulk$cellmarkers) - length(remove.markers)
@@ -896,7 +896,7 @@ setupSingleCell <- function(obj, sample.col,
       all.cols <- gsub(" ", "", all.cols)
 
       cell.cols <- grep(paste0("^\\b", nospace.name, "\\b$"), all.cols)
-      
+
       celltype.filt <- pseudobulk$dat[,cell.cols]
 
       # Match sample name
@@ -921,7 +921,7 @@ setupSingleCell <- function(obj, sample.col,
 
       rownames(cleaned.filt) <- paste0(curr.name, "_", rownames(cleaned.filt))
       colnames(cleaned.filt) <- dat.cols
-      
+
       cleaned.filt <- cleaned.filt[which(rownames(cleaned.filt) %in% percexp$cell_gene),]
 
       if(is.null(gene.select)) {
@@ -936,27 +936,27 @@ setupSingleCell <- function(obj, sample.col,
       }
     }
   }
-  
+
   allpresent.cols <- names(which(table(colsvec) == num.markers))
-  
+
   if(length(allpresent.cols) == 1) {
     cat("Please remove cell types. Only one patient with all cell types\n")
     stop
   }
-  
+
   #Filtering non-filtered data
   for(c in names(notfiltered.cellexps)) {
-    
+
     allpresent.filt.data <- notfiltered.cellexps[[c]][,which(colnames(notfiltered.cellexps[[c]]) %in%
                                                               allpresent.cols)]
-    
+
     if(is.null(nrow(allpresent.filt.data))) {
       cat(c, " was omitted due to lack of uniform expression.\n")
     } else {
-    
+
       duplicate.cols <- which(apply(allpresent.filt.data, 1,
                                     function(x) length(unique(x))==1) == TRUE)
-  
+
       if(length(duplicate.cols) > 0) {
         notfiltered.cellexps[[c]] <- allpresent.filt.data[-duplicate.cols,]
       } else {
@@ -964,18 +964,18 @@ setupSingleCell <- function(obj, sample.col,
       }
     }
   }
-  
+
   # Only using samples that have all the cell types of interest
   for(c in names(filtered.cellexps)) {
     allpresent.filt.data <- filtered.cellexps[[c]][,which(colnames(filtered.cellexps[[c]]) %in%
                                                             allpresent.cols)]
-    
+
     if(is.null(nrow(allpresent.filt.data))) {
       temp <- "hi"
     } else {
       duplicate.cols <- which(apply(allpresent.filt.data, 1,
                                     function(x) length(unique(x)) == 1) == TRUE)
-  
+
       if(length(duplicate.cols) > 0) {
         filtered.cellexps[[c]] <- allpresent.filt.data[-duplicate.cols,]
       } else {
@@ -1012,10 +1012,10 @@ SingleToBulk <- function(obj, assay, samplecol, celltypecol) {
   rownames(obj@meta.data) <- temp.rownames
 
   Idents(obj) <- "group.ctype"
-  avg.obj <- AverageExpression(obj, return.seurat=T, assays=assay)
-  
+  avg.obj <- Seurat::AverageExpression(obj, return.seurat=T, assays=assay)
+
   avg.dat <- GetAssayData(avg.obj, "data") %>% as.matrix
-  
+
   avg.dat[is.na(avg.dat)] <- 0
 
   avg.scaled <- t(scale(t(avg.dat)))

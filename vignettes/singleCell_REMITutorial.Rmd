@@ -1,0 +1,70 @@
+---
+title: "singleCell_REMITutorial.Rmd"
+output: html_document
+---
+
+Installing REMI
+```{r}
+install.packages("devtools")
+library(devtools)
+install_github("ayu1/remi")
+
+library(remi)
+```
+
+Download data from: https://figshare.com/s/871cb53e8fb5206bf8d0
+
+Dataset is from Laughney et al. Regenerative lineages and immune-mediated pruning in lung cancer metastasis (2020). Data has been integrated and scaled.
+
+Read in dataset formatted as a Seurat object
+```{r}
+seurat.obj <- readRDS("~/Downloads/laughneytumor_forREMI.rds")
+```
+
+## Constructing a REMI network on subset of Laughney et al's single-cell RNA-sequencing dataset
+- Current run time ~ 20 minutes, working on speeding up the run time
+```{r}
+#Cell types with few cells
+remove.celltypes <- c("MICROGLIA/MACROPHAGE", 
+                      "NEUTROPHIL", 
+                      "DENDRITIC (ACTIVATED)", 
+                      "IG")
+
+#Set sample.col as column listing sample IDs
+#Set celltype.col as column listing cell type category of interest
+# Filter = TRUE removes low expressed ligand and receptors from analysis
+# Threshold = expression level cut-off
+# Expthres = percent expressed per cell type cut-off
+data.obj <- setupSingleCell(seurat.obj, 
+                          sample.col = "Sample.ID",
+                          celltype.col = "CELL_TYPE",
+                          filter=T,
+                          assay="integrated",
+                          remove.markers = remove.celltypes,
+                          thres=0.5,
+                          expthres = 0.25)
+
+# Run REMI using default parameters
+remi.obj <- remi(data.obj$cellmarkers, data.obj)
+```
+
+Viewing REMI network
+- Recommend removing edges with lower weights (i.e. < 0.1)
+```{r}
+head(remi.obj$interactome)
+```
+
+Plotting REMI Circo Plot
+```{r}
+library(RColorBrewer)
+# Setting colors for each cell type
+grid.col = c(brewer.pal(8, "Set2"), brewer.pal(8, "Set1"))
+names(grid.col) <- data.obj$cellmarkers
+
+REMIPlot(remi.obj, grid.col=grid.col, legend=F)
+```
+
+
+
+
+
