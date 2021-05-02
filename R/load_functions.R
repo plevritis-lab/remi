@@ -865,7 +865,7 @@ setupSingleCell <- function(obj, sample.col,
 
   cat("Calculating percent expressed for ligand and receptor genes\n")
 
-  Idents(obj) <- celltype.col
+  Seurat::Idents(obj) <- celltype.col
   d <- Seurat::DotPlot(obj, features=rownames(obj))
   percexp <- d$data %>%
     dplyr::filter(pct.exp > expthres) %>%
