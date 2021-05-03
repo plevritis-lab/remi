@@ -3,7 +3,7 @@ title: "Single Cell RNA-Sequencing REMI Tutorial"
 author: "Alice Yu"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteIndexEntry{Single Cell RNA-Sequencing REMI Tutorial}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -29,7 +29,6 @@ remove.celltypes <- c("MICROGLIA/MACROPHAGE",
                       "NEUTROPHIL", 
                       "DENDRITIC (ACTIVATED)", 
                       "IG")
-
 #Set sample.col as column listing sample IDs
 #Set celltype.col as column listing cell type category of interest
 # Filter = TRUE removes low expressed ligand and receptors from analysis
@@ -43,7 +42,6 @@ data.obj <- setupSingleCell(seurat.obj,
                           remove.markers = remove.celltypes,
                           thres=0.5,
                           expthres = 0.25)
-
 # Run REMI using default parameters
 remi.obj <- remi(data.obj$cellmarkers, data.obj)
 ```
@@ -60,11 +58,5 @@ library(RColorBrewer)
 # Setting colors for each cell type
 grid.col = c(brewer.pal(8, "Set2"), brewer.pal(8, "Set1"))
 names(grid.col) <- data.obj$cellmarkers
-
 REMIPlot(remi.obj, grid.col=grid.col, legend=F)
 ```
-
-
-
-
-

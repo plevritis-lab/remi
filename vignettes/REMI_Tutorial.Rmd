@@ -1,10 +1,9 @@
 ---
-title: " Bulk RNA-Sequencing REMI Tutorial"
-output: html_document
+title: "Bulk RNA-Sequencing REMI Tutorial"
 author: "Alice Yu"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteIndexEntry{Bulk RNA-Sequencing REMI Tutorial}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
