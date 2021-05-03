@@ -1,5 +1,5 @@
 ---
-title: "singleCell_REMITutorial.Rmd"
+title: "Single Cell RNA-Sequencing REMI Tutorial"
 author: "Alice Yu"
 output: rmarkdown::html_vignette
 vignette: >
@@ -8,12 +8,7 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-Installing REMI
 ```{r}
-# %\VignetteEngine{knitr::knitr}
-# install.packages("devtools")
-# library(devtools)
-# install_github("ayu1/remi")
 library(remi)
 ```
 

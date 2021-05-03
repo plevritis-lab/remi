@@ -1,5 +1,5 @@
 ---
-title: "remi_tutorial.Rmd"
+title: " Bulk RNA-Sequencing REMI Tutorial"
 output: html_document
 author: "Alice Yu"
 output: rmarkdown::html_vignette
@@ -12,6 +12,7 @@ vignette: >
 The files that are loaded need to be downloaded from the Github
 Reading in required libraries
 Reading in code and databases
+
 ```{r setup, include=FALSE}
 # Loading packages
 library(remi)
@@ -21,6 +22,7 @@ Input file is a log-transformed bulk flow-sorted RNA-sequencing dataset
 Data is from Gentles et al. 2020
 https://genomebiology.biomedcentral.com/articles/10.1186/s13059-020-02019-x 
 Column names are labeled as samplename_celltype
+
 ```{r}
 # this should be a dataset that the user can download on their own for the tutorial?
 dat <- read.csv("~/Projects/rotation_remi/data/test/bulk_flowsort/U01Adeno_logged.csv", row.names=1)
