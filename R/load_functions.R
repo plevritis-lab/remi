@@ -653,27 +653,27 @@ REMIPlot <- function(interactome, type="chord",
 
   chord.format <- interactome$interactome %>%
     dplyr::filter(weight > thres) %>%
-    dplyr::mutate(node1 = paste0(n1cell, "_", ligand)) %>%
-    dplyr::mutate(node2 = paste0(n2cell, "_", receptor))
+    dplyr::mutate(node1 = paste0(sending, "_", ligand)) %>%
+    dplyr::mutate(node2 = paste0(receiving, "_", receptor))
 
   if(!(is.null(selectcell))) {
     chord.format <- chord.format %>%
-      filter(n1cell == selectcell | n2cell == selectcell)
+      filter(sending == selectcell | receiving == selectcell)
   }
 
   chord.sigmaxedges <- chord.format %>%
-    dplyr::select(node1, node2, n1cell, n2cell) %>%
+    dplyr::select(node1, node2, sending, receiving) %>%
     unique()
 
   strsplit.ind <- seq(from=1, by=2, length.out = nrow(chord.sigmaxedges))
   adeno.lr <- chord.sigmaxedges %>%
-    dplyr::mutate(celltypes = paste0(n1cell, "_", n2cell)) %>%
+    dplyr::mutate(celltypes = paste0(sending, "_", receiving)) %>%
     dplyr::group_by(celltypes) %>%
     dplyr::mutate(count = dplyr::n()) %>%
     dplyr::ungroup()
 
   df2 <- adeno.lr %>%
-    dplyr::select(n1cell, n2cell, count) %>%
+    dplyr::select(sending, receiving, count) %>%
     unique()
 
   # Colors for the different cell types
@@ -697,8 +697,8 @@ REMIPlot <- function(interactome, type="chord",
 
   if(type == "alluvial") {
     p <- ggplot(df2,
-           aes(y = count, axis1 = n1cell, axis2 = n2cell)) +
-      geom_alluvium(aes(fill = n1cell), width = 1/12) +
+           aes(y = count, axis1 = sending, axis2 = receiving)) +
+      geom_alluvium(aes(fill = sending), width = 1/12) +
       geom_stratum(width = 1/12) +
       geom_text(stat = "stratum", aes(label = after_stat(stratum)), size=size) +
       scale_x_discrete(limits = c("Signaling", "Receiving"), expand = c(.05, .05)) +
