@@ -642,14 +642,38 @@ remi <- function(dat.list,
 #'
 #'
 #' @param interactome Predicted interactome
+#' @param type Plot type, either chord or alluvial
 #' @param grid.col Optional: color option for cell type
+#' @param size Size of the font
+#' @param thres Remove LR pairs below this weight threshold
+#' @param selectcell Particular cell to highlight in the chord diagram
+#' @param legend Plot legend
 #' @return Chord Diagram highlighting proportion of cell-types in interactome
 #' @export
 #'
-REMIPlot <- function(interactome, type="chord",
-                     grid.col=NULL, size=10, thres=0,
+REMIPlot <- function(interactome,
+                     type="chord",
+                     grid.col=NULL,
+                     size=10,
+                     thres=0,
                      selectcell = NULL,
                      legend = FALSE) {
+
+  if(is.null(grid.col)) {
+    color.dump <- c(brewer.pal(8, "Set1"),
+                    brewer.pal(8, "Set2"),
+                    brewer.pal(8, "Set3"))
+
+    marker.list <- unique(c(interactome$interactome$sending,
+                            interactome$interactome$receiving))
+
+    if(length(marker.list) > length(color.dump)) {
+      cat("Not enough pre-rendered colors. Please enter own color list in grid.col variable\n")
+    }
+
+    grid.col <- color.dump[1:length(marker.list)]
+    names(grid.col) <- marker.list
+  }
 
   chord.format <- interactome$interactome %>%
     dplyr::filter(weight > thres) %>%
