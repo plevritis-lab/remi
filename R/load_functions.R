@@ -865,15 +865,20 @@ setupSingleCell <- function(obj, sample.col,
 
   cat("Calculating percent expressed for ligand and receptor genes\n")
 
-  Seurat::Idents(obj) <- celltype.col
-  d <- Seurat::DotPlot(obj, features=rownames(obj))
+  lr.genes <- unique(curr.lr.filt$Ligand, curr.lr.filt$Receptor)
+
+  lr.obj <- subset(obj, features=lr.genes)
+
+  Seurat::Idents(lr.obj) <- celltype.col
+  d <- Seurat::DotPlot(lr.obj, features=rownames(lr.obj), assay=assay)
+
   percexp <- d$data %>%
     dplyr::filter(pct.exp > expthres) %>%
     dplyr::mutate(cell_gene = paste0(id, "_", features.plot))
 
   cat("Averaging expression\n")
 
-  pseudobulk <- SingleToBulk(obj, assay, sample.col, celltype.col)
+  pseudobulk <- SingleToBulk(lr.obj, assay, sample.col, celltype.col)
 
   num.markers <- length(pseudobulk$cellmarkers) - length(remove.markers)
   print(num.markers)
@@ -971,7 +976,7 @@ setupSingleCell <- function(obj, sample.col,
                                                             allpresent.cols)]
 
     if(is.null(nrow(allpresent.filt.data))) {
-      temp <- "hi"
+      temp <- NULL
     } else {
       duplicate.cols <- which(apply(allpresent.filt.data, 1,
                                     function(x) length(unique(x)) == 1) == TRUE)
