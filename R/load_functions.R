@@ -196,10 +196,15 @@ generateLRnet <- function(lr.table, celltypes, datlist, cor=T, verbose=T) {
 #' @param  lr.table List of cell type-specific LR pairs
 #' @return A table of correlations for each LR pair
 #' @export
-calculateCor <- function(lr.obj, randomize=F, l.chosen=NULL, r.chosen=NULL, T_star=0) {
+calculateCor <- function(lr.obj, randomize=F, l.chosen=NULL,
+                         r.chosen=NULL, T_star=0) {
 
   allcellexp <- lr.obj$expanddata
   lr.table <- lr.obj$lr.network.pairs
+
+  if(nrow(lr.table) == 0) {
+    cat("Not enough genes in expression table. Please lower threshold filtering.\n")
+  }
 
   lr.genes <- unique(c(lr.table$L, lr.table$R))
 
@@ -209,6 +214,8 @@ calculateCor <- function(lr.obj, randomize=F, l.chosen=NULL, r.chosen=NULL, T_st
 
   lr.cor <- cor(t(lr.allcellexp))
 
+  View(lr.cor)
+
   if(randomize == T) {
     lr.cor[l.chosen, r.chosen] <- T_star
     lr.cor[r.chosen, l.chosen] <- T_star
@@ -217,8 +224,10 @@ calculateCor <- function(lr.obj, randomize=F, l.chosen=NULL, r.chosen=NULL, T_st
   for(i in 1:nrow(lr.table)) {
     ligand <- lr.table$L[i]
     receptor <- lr.table$R[i]
+
     cor.res <- lr.cor[which(rownames(lr.cor) == ligand),
                       which(colnames(lr.cor) == receptor)]
+
     pairwise.lr[i,3] <- cor.res
   }
 
@@ -229,6 +238,7 @@ calculateCor <- function(lr.obj, randomize=F, l.chosen=NULL, r.chosen=NULL, T_st
   pairwise.lr$cor <- as.numeric(paste0(pairwise.lr$cor))
 
   return(list(pairwiseLR=pairwise.lr, expanddata=allcellexp, lr.cor = lr.cor))
+
 }
 
 
@@ -543,7 +553,12 @@ cleaningOutput <- function(input, netlist) {
   net.edges.filt <- dplyr::bind_rows(within.edges, between.edges)
 
   filtered.net.edges <- net.edges.filt %>%
-    dplyr::filter(abs(as.numeric(weight)) > 0)
+    dplyr::filter(abs(as.numeric(weight)) > 0) %>%
+    dplyr::select(ligand, receptor,
+                  n1cell, n2cell,
+                  weight, cor, commnum) %>%
+    dplyr::rename(sending = n1cell) %>%
+    dplyr::rename(receiving = n2cell)
 
   return(list(net.edges=net.edges.filt,
               filtered.net.edges=filtered.net.edges))
@@ -563,20 +578,25 @@ cleaningOutput <- function(input, netlist) {
 #' @return List of cabernet predictions
 #' @export
 #'
-remi <- function(cellmarkers, dat.list, seed=30,
-                 lambda=NULL, lr.database=NULL,
-                 downstreamgenes=NULL, ppi.net=NULL,
-                 cd = "Louvain", maxNum = NULL) {
+remi <- function(dat.list,
+                 cellmarkers = dat.list$cellmarkers,
+                 seed=30,
+                 lambda=NULL,
+                 lr.database=NULL,
+                 #downstreamgenes=NULL,
+                 ppi.net=NULL,
+                 cd = "Louvain",
+                 maxNum = NULL) {
 
   if(is.null(lr.database)) {lr.database = curr.lr.filt}
-  if(is.null(downstreamgenes)) {downstreamgenes = pathway.genelist}
+  #if(is.null(downstreamgenes)) {downstreamgenes = pathway.genelist}
   if(is.null(ppi.net)) {ppi.net = g.biogrid}
 
   # Creating LR network
   cat("Building LR network\n")
   pathwaygenes <- unique(unlist(pathway.genelist$genesets))
   netlist <- generateLRnet(lr.database, cellmarkers,
-                           dat.list$filtered, downstreamgenes)
+                           dat.list$filtered)
 
   # Cluster
   cat("Detecting communities")
@@ -776,7 +796,8 @@ calculateSignificance <- function(obj,
                                   r.chosen=r.chosen,
                                   T_star=T_star)
 
-    boot.net <- graph_from_edgelist(as.matrix(R_star_cor_df$pairwiseLR[,c("L", "R")]), directed=F)
+    boot.net <- graph_from_edgelist(as.matrix(R_star_cor_df$pairwiseLR[,c("L", "R")]),
+                                    directed=F)
     E(boot.net)$weight <- abs(as.numeric(R_star_cor_df$pairwiseLR[,"cor"]))
 
     commboot.output <- remifiedCommunities(net=boot.net,
@@ -870,7 +891,9 @@ setupSingleCell <- function(obj, sample.col,
   lr.obj <- subset(obj, features=lr.genes)
 
   Seurat::Idents(lr.obj) <- celltype.col
-  d <- Seurat::DotPlot(lr.obj, features=rownames(lr.obj), assay=assay)
+  d <- suppressWarnings(Seurat::DotPlot(lr.obj,
+                                        features=rownames(lr.obj),
+                                        assay=assay))
 
   percexp <- d$data %>%
     dplyr::filter(pct.exp > expthres) %>%
@@ -878,7 +901,7 @@ setupSingleCell <- function(obj, sample.col,
 
   cat("Averaging expression\n")
 
-  pseudobulk <- SingleToBulk(lr.obj, assay, sample.col, celltype.col)
+  pseudobulk <- SingleToBulk(obj, assay, sample.col, celltype.col)
 
   num.markers <- length(pseudobulk$cellmarkers) - length(remove.markers)
   print(num.markers)
