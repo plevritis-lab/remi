@@ -125,7 +125,7 @@ clusterLouvain <- function(net, commnums, communities) {
   for(cc in commnums) {
     comm.net <- igraph::induced_subgraph(net,names(communities[communities==cc]))
     louvain.comms <- igraph::membership(igraph::cluster_louvain(comm.net))
-    suppresWarnings(if(is.na(final.comms)) {
+    suppressWarnings(if(is.na(final.comms)) {
       final.comms <- louvain.comms
     } else {
       final.comms <- c(final.comms, louvain.comms+max(final.comms))
