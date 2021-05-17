@@ -622,6 +622,8 @@ remi <- function(dat.list,
     return(NULL)
   }
 
+  sum(unlist(lapply(colon$filtered, function(x) {ncol(x)})))
+
   params <- list()
   params[["seed"]] <- seed
 
@@ -899,7 +901,8 @@ calculateSignificance <- function(obj,
 #' @return Single cell REMI object that can be used by the algorithm
 #' @export
 #'
-setupSingleCell <- function(obj, sample.col,
+setupSingleCell <- function(obj,
+                            sample.col,
                             celltype.col,
                             remove.markers = NULL,
                             gene.select = NULL,
@@ -928,6 +931,7 @@ setupSingleCell <- function(obj, sample.col,
   pseudobulk <- SingleToBulk(obj, assay, sample.col, celltype.col)
 
   num.markers <- length(pseudobulk$cellmarkers) - length(remove.markers)
+
   print(num.markers)
 
   filtered.cellexps <- list()
@@ -942,6 +946,7 @@ setupSingleCell <- function(obj, sample.col,
     if(!(curr.name %in% remove.markers)) {
 
       nospace.name <- as.character(gsub(" ", "", curr.name))
+      nospace.name <- gsub("+", "\\+", nospace.name, fixed=TRUE)
 
       all.cols <- unlist(lapply(colnames(pseudobulk$dat),
                                 function(x) {strsplit(x, "_")[[1]][2]}))
@@ -1036,11 +1041,25 @@ setupSingleCell <- function(obj, sample.col,
     }
   }
 
+
   if(filter == F) {
+
+    sumcol <- sum(unlist(lapply(notfiltered.cellexps, function(x) {ncol(x)})))
+    if(sumcol == 0) {
+      cat("No samples had all cell types of interest.")
+    }
+
     return(list(filtered=notfiltered.cellexps,
                 unfiltered=notfiltered.cellexps,
                 cellmarkers=setdiff(pseudobulk$cellmarkers, remove.markers)))
   } else {
+
+    sumcol <- sum(unlist(lapply(filtered.cellexps, function(x) {ncol(x)})))
+
+    if(sumcol == 0) {
+      cat("No samples had all cell types of interest.")
+    }
+
     return(list(filtered=filtered.cellexps,
                 unfiltered=notfiltered.cellexps,
                 cellmarkers=setdiff(pseudobulk$cellmarkers, remove.markers)))
