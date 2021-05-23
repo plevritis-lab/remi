@@ -93,7 +93,8 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
                 unfiltered = notfiltered.cellexps))
   } else {
     return(list(filtered=filtered.cellexps,
-                unfiltered=notfiltered.cellexps))
+                unfiltered=notfiltered.cellexps,
+                cellmarkers = cellmarkers))
   }
 }
 
@@ -213,8 +214,6 @@ calculateCor <- function(lr.obj, randomize=F, l.chosen=NULL,
   pairwise.lr <- matrix(NA, nrow=nrow(lr.table), ncol=3)
 
   lr.cor <- cor(t(lr.allcellexp))
-
-  View(lr.cor)
 
   if(randomize == T) {
     lr.cor[l.chosen, r.chosen] <- T_star
