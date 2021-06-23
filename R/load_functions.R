@@ -613,15 +613,10 @@ remi <- function(dat.list,
 
   predicted.edges <- cleaningOutput(glasso.output, netlist)
 
-  numLRs <- length(unique(predicted.edges$filtered.net.edges$node1,
-                          predicted.edges$filtered.net.edges$node2))
-
   if(nrow(predicted.edges$filtered.net.edges) == 0) {
     cat("\nNo interactome found\n")
     return(NULL)
   }
-
-  sum(unlist(lapply(colon$filtered, function(x) {ncol(x)})))
 
   params <- list()
   params[["seed"]] <- seed
@@ -903,12 +898,17 @@ calculateSignificance <- function(obj,
 setupSingleCell <- function(obj,
                             sample.col,
                             celltype.col,
+                            keep.markers = NULL,
                             remove.markers = NULL,
                             gene.select = NULL,
                             assay="integrated",
                             filter=T,
                             thres=0,
                             expthres = 0.1) {
+
+  if(is.null(keep.markers)) {
+    keep.markers <- unique(obj@meta.data[,celltype.col])
+  }
 
   cat("Calculating percent expressed for ligand and receptor genes\n")
 
@@ -929,9 +929,10 @@ setupSingleCell <- function(obj,
 
   pseudobulk <- SingleToBulk(obj, assay, sample.col, celltype.col)
 
-  num.markers <- length(pseudobulk$cellmarkers) - length(remove.markers)
+  #num.markers <- length(pseudobulk$cellmarkers) - length(remove.markers)
+  num.markers <- length(keep.markers)
 
-  print(num.markers)
+  cat("Number of markers\t", num.markers, "\n")
 
   filtered.cellexps <- list()
   notfiltered.cellexps <- list()
@@ -940,9 +941,12 @@ setupSingleCell <- function(obj,
 
   for(i in 1:length(pseudobulk$cellmarkers)) {
 
+    print(i)
+
     curr.name <- pseudobulk$cellmarkers[i]
 
-    if(!(curr.name %in% remove.markers)) {
+    #if(!(curr.name %in% remove.markers)) {
+    if(curr.name %in% keep.markers) {
 
       nospace.name <- as.character(gsub(" ", "", curr.name))
       nospace.name <- gsub("+", "\\+", nospace.name, fixed=TRUE)
@@ -953,6 +957,8 @@ setupSingleCell <- function(obj,
 
       cell.cols <- grep(paste0("^\\b", nospace.name, "\\b$"), all.cols)
 
+      print(cell.cols)
+
       celltype.filt <- pseudobulk$dat[,cell.cols]
 
       # Match sample name
@@ -961,7 +967,8 @@ setupSingleCell <- function(obj,
       colsvec <- c(colsvec, dat.cols)
 
       # Removing genes with low expression
-      removegenes <- rownames(celltype.filt)[which(rowMeans(celltype.filt) <= thres)]
+      #removegenes <- rownames(celltype.filt)[which(rowMeans(celltype.filt) <= thres)]
+      removegenes <- NULL
 
       # Finalized cleaned data matrix
       if(length(removegenes) > 0) {
@@ -979,6 +986,8 @@ setupSingleCell <- function(obj,
       colnames(cleaned.filt) <- dat.cols
 
       cleaned.filt <- cleaned.filt[which(rownames(cleaned.filt) %in% percexp$cell_gene),]
+
+      print(dim(cleaned.filt))
 
       if(is.null(gene.select)) {
         filtered.cellexps[[curr.name]] <- cleaned.filt
@@ -1039,7 +1048,6 @@ setupSingleCell <- function(obj,
       }
     }
   }
-
 
   if(filter == F) {
 
