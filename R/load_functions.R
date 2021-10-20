@@ -111,10 +111,15 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
 #' @export
 #'
 expandLRpairs <- function(lr.table, datlist, celltypes) {
+
+  View(lr.table)
+  View(celltypes)
+
   # Creating vectors of cell type-specific ligand, receptor, and pathway genes
   all.rs <- c()
   all.ls <- c()
   for(i in celltypes) {
+    print(i)
     all.rs <- c(all.rs, unique(paste0(i, "_", lr.table$Receptor)))
     all.ls <- c(all.ls, unique(paste0(i, "_", lr.table$Ligand)))
   }
@@ -181,10 +186,13 @@ generateLRnet <- function(lr.table, celltypes, datlist, cor=T, verbose=T) {
   if(verbose == T) cat("Step 3/3: Creating graph object\n")
   lr.network <- igraph::graph_from_edgelist(as.matrix(lr.network.pairs$lr.network.pairs[,c(1,2)]),
                                             directed=F)
+
   igraph::E(lr.network)$weight <- abs(as.numeric(paste0(pairwise.cor$pairwiseLR$cor)))
 
-  return(list(net=lr.network, mat=lr.network.pairs$lr.network.pairs,
-              pairwisecor=pairwise.cor, expanddata=lr.network.pairs$expanddata))
+  return(list(net=lr.network,
+              mat=lr.network.pairs$lr.network.pairs,
+              pairwisecor=pairwise.cor,
+              expanddata=lr.network.pairs$expanddata))
 }
 
 
@@ -579,11 +587,11 @@ cleaningOutput <- function(input, netlist) {
 #'
 remi <- function(dat.list,
                  cellmarkers = dat.list$cellmarkers,
-                 seed=30,
-                 lambda=NULL,
-                 lr.database=NULL,
+                 seed = 30,
+                 lambda = NULL,
+                 lr.database = NULL,
                  #downstreamgenes=NULL,
-                 ppi.net=NULL,
+                 ppi.net = NULL,
                  cd = "Louvain",
                  maxNum = NULL) {
 
@@ -594,7 +602,8 @@ remi <- function(dat.list,
   # Creating LR network
   cat("Building LR network\n")
   pathwaygenes <- unique(unlist(pathway.genelist$genesets))
-  netlist <- generateLRnet(lr.database, cellmarkers,
+  netlist <- generateLRnet(lr.database,
+                           cellmarkers,
                            dat.list$filtered)
 
   # Cluster
