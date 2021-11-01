@@ -12,7 +12,7 @@ Install R (>= 3.6)
 ```
 install.packages("devtools")
 library(devtools)
-install_github("ayu1/remi")
+install_github("plevritis-lab/remi")
 ```
 
 ## Usage
