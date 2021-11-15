@@ -1,6 +1,6 @@
 ---
 title: "Bulk RNA-Sequencing REMI Tutorial"
-author: "Alice Yu"
+author: "Alice Yu, Christine Yeh"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Bulk RNA-Sequencing REMI Tutorial}
@@ -8,53 +8,66 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-The files that are loaded need to be downloaded from the Github
-Reading in required libraries
-Reading in code and databases
-
-```{r setup, include=FALSE}
-# Loading packages
-#library(remi)
-source("../R/load_functions.R")
-source("../R/load_subfunctions.R")
-load("../data/curr.lr.filt.rda")
-load("../data/g.biogrid.rda")
-load("../data/pathway.genelist.rda")
-load("../data/pathway.genes.rda")
-```
-
-Input file is a log-transformed bulk flow-sorted RNA-sequencing dataset
-Data is from Gentles et al. 2020
-https://genomebiology.biomedcentral.com/articles/10.1186/s13059-020-02019-x 
-Column names are labeled as samplename_celltype
-
+# Getting started with REMI
 ```{r}
-# this should be a dataset that the user can download on their own for the tutorial?
-dat <- read.csv("U01Adeno_logged.csv", row.names=1)
+# install.packages("devtools")
+library(devtools); library(knitr)
+# install_github("plevritis-lab/remi")
+library(remi)
 ```
 
-Set up data for REMI
-There is a built in filtering step for REMI where users can choose to threshold their genes based on quantiles. The number 4 represents binning the data into four quantiles and removing data with expression levels in the lowest quantile. Filtering can also be turned off (filter = F)
+# Read in data
+Input file is a log-transformed bulk flow-sorted RNA-sequencing dataset from Gentles et al. _Genome Biology_ (2020). Column names are labeled as samplename_celltype.
+```{r}
+dat <- read.csv("data/U01Adeno_logged.csv", row.names=1)
+```
 
-OR users can pre-threshold the genes and turn the filter off, but setupData needs to run in order to make a REMI object for the algorithm
-
-Data must be log-transformed for input, no prior scaling or normalization
-
+# Running REMI
+There is a built in filtering step for REMI where users can choose to threshold their genes based on quantiles. The number 4 represents the number of bins the data is separated into. Genes in the lowest expression quantile will be removed. Users can also turn off the filtering option (filter = F), but setupData needs to run in order to make a REMI object for the algorithm. Note: the run time of REMI is proportional to the number of cell types of interest. 
 ```{r}
 # list of cell types user wants to analyze 
 celltypes <- c("I", "E", "F", "M")
-cellexp.list <- setupData(dat, celltypes, 4, filter=T)
-
+# Create REMI object
+exp.list <- setupData(dat, celltypes, 4, filter=T)
 # RUNNING REMI
-adeno.remi <- remi(cellexp.list, 
-                   cd="Louvain",
-                   maxNum = ncol(cellexp.list$filtered$I))
-
+remi.obj <- remi(exp.list)
 ```
 
+# REMI Output
+REMI interactome table
+```{r}
+kable(remi.obj$interactome, 5)
+```
 
+Plotting option #1
+```{r}
+# Defining colors for each cell type
+grid.col <- c("F" = '#BB6A23', 
+              "I" = "#195188", 
+              "M" = "#00503C", 
+              "E" = "#AC371F")
+# Plotting an alluvial plot showing proportion of cell types interacting
+REMIPlot(remi.obj, 
+         type="alluvial", 
+         grid.col=grid.col)
+```
 
+Plotting option #2
+```{r}
+# Plotting a chord diagram showing proportion of cell types interacting
+REMIPlot(remi.obj, 
+         type="chord", 
+         grid.col=grid.col)
+```
 
+# Calculate significance of an edge
+Enter in ligand and receptor of choice and which community number the pair is located in. The p-value is calculated with respect to the community. Please add cell type of ligand into ligand name (celltype_ligand) and cell type of receptor into receptor name (celltype_receptor) as input. Note: this step may take a while and we recommend only running it for LR pairs of interest.
+```{r}
+pval <- calculateSignificance(remi.obj, 
+                              l.chosen="F_CTGF", 
+                              r.chosen="F_LRP6", 
+                              community.num ="50") 
+```
 
 
 
