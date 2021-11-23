@@ -5,7 +5,16 @@
 \title{Calculating eigenvector centrality for each receptor given downstream
 protein protein-interaction signaling network.}
 \usage{
-pickECgenes(lrnet, dat.list, pgenelist, numgenes, cutoff, ppi, seed = 10)
+pickECgenes(
+  lrnet,
+  dat.list,
+  pgenelist,
+  numgenes,
+  cutoff,
+  ppi,
+  seed = 10,
+  verbose = T
+)
 }
 \arguments{
 \item{lrnet}{List of cell type-specific LR pairs}

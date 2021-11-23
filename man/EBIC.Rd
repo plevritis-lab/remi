@@ -4,7 +4,7 @@
 \alias{EBIC}
 \title{EBIC calculation}
 \usage{
-EBIC(S, K, n, gamma = 0.5, E, countDiagonal = FALSE)
+EBIC(S, K, n, E, gamma = 1, countDiagonal = FALSE)
 }
 \arguments{
 \item{S}{Covariance matrix}

@@ -4,7 +4,7 @@
 \alias{makePPINetwork}
 \title{Making network function}
 \usage{
-makePPINetwork(data, filt.genes, pathgenes, c, ppi = g.biogrid)
+makePPINetwork(data, filt.genes, pathgenes, c, lrmat, ppi = g.biogrid)
 }
 \arguments{
 \item{data}{Gene expression data}

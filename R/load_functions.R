@@ -112,8 +112,8 @@ setupData <- function(dat, cellmarkers, filter=T, var = 3) {
 #'
 expandLRpairs <- function(lr.table, datlist, celltypes) {
 
-  View(lr.table)
-  View(celltypes)
+  # View(lr.table)
+  # View(celltypes)
 
   # Creating vectors of cell type-specific ligand, receptor, and pathway genes
   all.rs <- c()
@@ -774,7 +774,7 @@ calculateSignificance <- function(obj,
     opt.lambda <- obj$interactome %>%
       dplyr::filter(commnum == comm.chosen) %>%
       dplyr::select(lambda) %>%
-      pull() %>% unique()
+      dplyr::pull() %>% unique()
   } else {
     opt.lambda <- lambda
   }

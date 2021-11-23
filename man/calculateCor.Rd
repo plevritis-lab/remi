@@ -4,12 +4,16 @@
 \alias{calculateCor}
 \title{calculateCor - calculating pairwise correlation for all the LR pairs}
 \usage{
-calculateCor(lr.table, dat.list)
+calculateCor(
+  lr.obj,
+  randomize = F,
+  l.chosen = NULL,
+  r.chosen = NULL,
+  T_star = 0
+)
 }
 \arguments{
 \item{lr.table}{List of cell type-specific LR pairs}
-
-\item{dat.list}{List of gene expression for each cell type}
 }
 \value{
 A table of correlations for each LR pair

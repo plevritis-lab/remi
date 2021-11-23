@@ -9,8 +9,10 @@ calculateCommGlasso(
   x,
   netlist,
   lambda.max = 0.9,
+  lambda = NULL,
   scale = F,
-  additional = NULL
+  additional = NULL,
+  verbose = T
 )
 }
 \arguments{

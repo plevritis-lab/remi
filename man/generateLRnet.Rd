@@ -4,7 +4,7 @@
 \alias{generateLRnet}
 \title{Generating cell type-specific ligand receptor pair network}
 \usage{
-generateLRnet(lr.table, celltypes, datlist, cor = T)
+generateLRnet(lr.table, celltypes, datlist, cor = T, verbose = T)
 }
 \arguments{
 \item{lr.table}{List of all ligand receptor pairs and their pair information}

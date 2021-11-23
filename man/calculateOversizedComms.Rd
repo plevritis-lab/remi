@@ -4,7 +4,7 @@
 \alias{calculateOversizedComms}
 \title{Calculating the degree of each community in a network}
 \usage{
-calculateOversizedComms(net, communities, dat)
+calculateOversizedComms(net, communities, dat, maxNum)
 }
 \arguments{
 \item{net}{LR network}

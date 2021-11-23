@@ -7,9 +7,7 @@
 cleaningOutput(input, netlist)
 }
 \arguments{
-\item{input}{Glasso output}
-
-\item{netlist}{Ligand receptor network}
+\item{obj}{REMI object}
 }
 \value{
 Cleaned up list of LR pairs with metadata displayed in columns

@@ -2,9 +2,18 @@
 % Please edit documentation in R/load_functions.R
 \name{remi}
 \alias{remi}
-\title{Cabernet algorithm}
+\title{REMI algorithm}
 \usage{
-remi(cellmarkers, dat.list, seed = 30, numgenes = 2, cutoff = 1)
+remi(
+  dat.list,
+  cellmarkers = dat.list$cellmarkers,
+  seed = 30,
+  lambda = NULL,
+  lr.database = NULL,
+  ppi.net = NULL,
+  cd = "Louvain",
+  maxNum = NULL
+)
 }
 \arguments{
 \item{dat.list}{List of gene expression for each cell type}

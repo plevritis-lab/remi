@@ -1,16 +1,16 @@
 install.packages(
   c(
 	'Seurat',
-	'qgraph', 
-	'data.table', 
-	'igraph', 
-	'glasso', 
+	'qgraph',
+	'data.table',
+	'igraph',
+	'glasso',
 	'tidyverse',
-	'OneR', 
-	'Matrix', 
-	'circlize'
-	'preprocessCore'
-	'viridis'
+	'OneR',
+	'Matrix',
+	'circlize',
+	'preprocessCore',
+	'viridis',
 	'networkD3'
   )
 )
