@@ -563,7 +563,7 @@ cleaningOutput <- function(input, netlist) {
     dplyr::filter(abs(as.numeric(weight)) > 0) %>%
     dplyr::select(ligand, receptor,
                   n1cell, n2cell,
-                  weight, cor, commnum) %>%
+                  weight, cor, commnum, lambda) %>%
     dplyr::rename(sending = n1cell) %>%
     dplyr::rename(receiving = n2cell)
 
@@ -764,8 +764,8 @@ calculateSignificance <- function(obj,
 
   # Setting Varibales
   allcellexp <- obj$lrnet$expanddata
-  node1 <- obj$interactome$node1
-  node2 <- obj$interactome$node2
+  node1 <- obj$interactome$ligand
+  node2 <- obj$interactome$receptor
   commnums <- obj$interactome$commnum
   param <- obj$params
   between <- FALSE
