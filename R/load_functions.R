@@ -746,7 +746,7 @@ REMIPlot <- function(interactome,
 #' @param obj REMI object
 #' @param l.chosen Ligand in edge
 #' @param r.chosen Receptor in edge
-#' @param comm.chosen Community that edge is present in
+#' @param community.num Community that edge is present in
 #' @param iterNum = Number of permutations for p-value calculation
 #' @param seednum = Seed
 #' @param lambda = Manually setting lambda if of interest
@@ -756,9 +756,9 @@ REMIPlot <- function(interactome,
 calculateSignificance <- function(obj,
                                   l.chosen,
                                   r.chosen,
-                                  comm.chosen,
+                                  community.num,
                                   maxNum,
-                                  iterNum = 1000,
+                                  iterNum = 100,
                                   seednum=30,
                                   lambda = NULL) {
 
@@ -772,19 +772,19 @@ calculateSignificance <- function(obj,
 
   if(is.null(lambda)) {
     opt.lambda <- obj$interactome %>%
-      dplyr::filter(commnum == comm.chosen) %>%
+      dplyr::filter(commnum == community.num) %>%
       dplyr::select(lambda) %>%
-      dplyr::pull() %>% unique()
+      pull() %>% unique()
   } else {
     opt.lambda <- lambda
   }
 
-  if("_" %in% comm.chosen) {
+  if("_" %in% community.num) {
     between = TRUE
   }
 
   # Obtaining community genes
-  comm.num.index <- which(commnums == comm.chosen)
+  comm.num.index <- which(commnums == community.num)
 
   orig.comm.genes <- unique(c(node1[comm.num.index],
                               node2[comm.num.index]))
@@ -890,7 +890,7 @@ calculateSignificance <- function(obj,
 
   return(list(pval=pval, D=D))
 }
-
+                                  
 #' Creating single cell REMI object
 #'
 #'
