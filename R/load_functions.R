@@ -5,8 +5,6 @@ if (!(requireNamespace("clusterProfiler", quietly = TRUE))) {
   BiocManager::install("clusterProfiler")
 }
 
-# TEST
-
 require(tidyverse)
 require(glasso)
 require(igraph)
