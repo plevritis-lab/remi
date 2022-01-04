@@ -757,7 +757,7 @@ calculateSignificance <- function(obj,
                                   l.chosen,
                                   r.chosen,
                                   community.num,
-                                  maxNum,
+                                  maxNum = NULL,
                                   iterNum = 100,
                                   seednum=30,
                                   lambda = NULL) {
