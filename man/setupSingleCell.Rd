@@ -8,7 +8,6 @@ setupSingleCell(
   obj,
   sample.col,
   celltype.col,
-  keep.markers = NULL,
   remove.markers = NULL,
   gene.select = NULL,
   assay = "integrated",

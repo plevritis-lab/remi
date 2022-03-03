@@ -19,7 +19,6 @@ require(msigdbr)
 require(dplyr)
 require(Seurat)
 
-
 #' Clean the data
 #'
 #' This function loads a file as a matrix,
@@ -119,7 +118,6 @@ expandLRpairs <- function(lr.table, datlist, celltypes) {
   all.rs <- c()
   all.ls <- c()
   for(i in celltypes) {
-    print(i)
     all.rs <- c(all.rs, unique(paste0(i, "_", lr.table$Receptor)))
     all.ls <- c(all.ls, unique(paste0(i, "_", lr.table$Ligand)))
   }
@@ -140,7 +138,9 @@ expandLRpairs <- function(lr.table, datlist, celltypes) {
   first.ind <- seq(from=1, by=2, length.out = nrow(allcombolr))
   second.ind <- seq(from=2, by=2, length.out = nrow(allcombolr))
 
-  lr.network.pairs <- data.table::data.table(allcombolr) %>%
+  cat(paste0("\n\tTotal ", dim(allcombolr)[1], " LR Combos to Search\n"))
+
+  lr.network.pairs <- data.frame(allcombolr) %>%
     dplyr::rename(L = Var1) %>%
     dplyr::rename(R = Var2) %>%
     dplyr::mutate(n1cell = unlist(strsplit(L, split="_"))[first.ind]) %>%
@@ -385,11 +385,6 @@ remifiedCommunities <- function(net, dat.list,
 
   return(list(names=commnames, membership=louvain.comms))
 }
-
-
-
-
-
 
 #' Calculate graphical lasso on each community to sparsify the network
 #'
@@ -890,7 +885,7 @@ calculateSignificance <- function(obj,
 
   return(list(pval=pval, D=D))
 }
-                                  
+
 #' Creating single cell REMI object
 #'
 #'
@@ -904,10 +899,8 @@ calculateSignificance <- function(obj,
 #' @return Single cell REMI object that can be used by the algorithm
 #' @export
 #'
-setupSingleCell <- function(obj,
-                            sample.col,
+setupSingleCell <- function(obj, sample.col,
                             celltype.col,
-                            keep.markers = NULL,
                             remove.markers = NULL,
                             gene.select = NULL,
                             assay="integrated",
@@ -915,21 +908,10 @@ setupSingleCell <- function(obj,
                             thres=0,
                             expthres = 0.1) {
 
-  if(is.null(keep.markers)) {
-    keep.markers <- unique(obj@meta.data[,celltype.col])
-  }
-
   cat("Calculating percent expressed for ligand and receptor genes\n")
 
-  lr.genes <- unique(curr.lr.filt$Ligand, curr.lr.filt$Receptor)
-
-  lr.obj <- subset(obj, features=lr.genes)
-
-  Seurat::Idents(lr.obj) <- celltype.col
-  d <- suppressWarnings(Seurat::DotPlot(lr.obj,
-                                        features=rownames(lr.obj),
-                                        assay=assay))
-
+  Seurat::Idents(obj) <- celltype.col
+  d <- Seurat::DotPlot(obj, features=rownames(obj))
   percexp <- d$data %>%
     dplyr::filter(pct.exp > expthres) %>%
     dplyr::mutate(cell_gene = paste0(id, "_", features.plot))
@@ -938,10 +920,8 @@ setupSingleCell <- function(obj,
 
   pseudobulk <- SingleToBulk(obj, assay, sample.col, celltype.col)
 
-  #num.markers <- length(pseudobulk$cellmarkers) - length(remove.markers)
-  num.markers <- length(keep.markers)
-
-  cat("Number of markers\t", num.markers, "\n")
+  num.markers <- length(pseudobulk$cellmarkers) - length(remove.markers)
+  print(num.markers)
 
   filtered.cellexps <- list()
   notfiltered.cellexps <- list()
@@ -950,23 +930,17 @@ setupSingleCell <- function(obj,
 
   for(i in 1:length(pseudobulk$cellmarkers)) {
 
-    print(i)
-
     curr.name <- pseudobulk$cellmarkers[i]
 
-    #if(!(curr.name %in% remove.markers)) {
-    if(curr.name %in% keep.markers) {
+    if(!(curr.name %in% remove.markers)) {
 
       nospace.name <- as.character(gsub(" ", "", curr.name))
-      nospace.name <- gsub("+", "\\+", nospace.name, fixed=TRUE)
 
       all.cols <- unlist(lapply(colnames(pseudobulk$dat),
                                 function(x) {strsplit(x, "_")[[1]][2]}))
       all.cols <- gsub(" ", "", all.cols)
 
       cell.cols <- grep(paste0("^\\b", nospace.name, "\\b$"), all.cols)
-
-      print(cell.cols)
 
       celltype.filt <- pseudobulk$dat[,cell.cols]
 
@@ -976,8 +950,7 @@ setupSingleCell <- function(obj,
       colsvec <- c(colsvec, dat.cols)
 
       # Removing genes with low expression
-      #removegenes <- rownames(celltype.filt)[which(rowMeans(celltype.filt) <= thres)]
-      removegenes <- NULL
+      removegenes <- rownames(celltype.filt)[which(rowMeans(celltype.filt) <= thres)]
 
       # Finalized cleaned data matrix
       if(length(removegenes) > 0) {
@@ -995,8 +968,6 @@ setupSingleCell <- function(obj,
       colnames(cleaned.filt) <- dat.cols
 
       cleaned.filt <- cleaned.filt[which(rownames(cleaned.filt) %in% percexp$cell_gene),]
-
-      print(dim(cleaned.filt))
 
       if(is.null(gene.select)) {
         filtered.cellexps[[curr.name]] <- cleaned.filt
@@ -1022,7 +993,7 @@ setupSingleCell <- function(obj,
   for(c in names(notfiltered.cellexps)) {
 
     allpresent.filt.data <- notfiltered.cellexps[[c]][,which(colnames(notfiltered.cellexps[[c]]) %in%
-                                                              allpresent.cols)]
+                                                               allpresent.cols)]
 
     if(is.null(nrow(allpresent.filt.data))) {
       cat(c, " was omitted due to lack of uniform expression.\n")
@@ -1045,7 +1016,7 @@ setupSingleCell <- function(obj,
                                                             allpresent.cols)]
 
     if(is.null(nrow(allpresent.filt.data))) {
-      temp <- NULL
+      temp <- "hi"
     } else {
       duplicate.cols <- which(apply(allpresent.filt.data, 1,
                                     function(x) length(unique(x)) == 1) == TRUE)
@@ -1059,23 +1030,10 @@ setupSingleCell <- function(obj,
   }
 
   if(filter == F) {
-
-    sumcol <- sum(unlist(lapply(notfiltered.cellexps, function(x) {ncol(x)})))
-    if(sumcol == 0) {
-      cat("No samples had all cell types of interest.")
-    }
-
     return(list(filtered=notfiltered.cellexps,
                 unfiltered=notfiltered.cellexps,
                 cellmarkers=setdiff(pseudobulk$cellmarkers, remove.markers)))
   } else {
-
-    sumcol <- sum(unlist(lapply(filtered.cellexps, function(x) {ncol(x)})))
-
-    if(sumcol == 0) {
-      cat("No samples had all cell types of interest.")
-    }
-
     return(list(filtered=filtered.cellexps,
                 unfiltered=notfiltered.cellexps,
                 cellmarkers=setdiff(pseudobulk$cellmarkers, remove.markers)))
@@ -1093,9 +1051,9 @@ setupSingleCell <- function(obj,
 SingleToBulk <- function(obj, assay, samplecol, celltypecol) {
   temp.rownames <- rownames(obj@meta.data)
   obj@meta.data <- obj@meta.data %>%
-  dplyr::mutate(samplesREMI = gsub("_", "", !!as.name(samplecol))) %>%
-  dplyr::mutate(group.ctype = paste0(samplesREMI, "_" , !!as.name(celltypecol))) %>%
-  dplyr::mutate(group.ctype = as.factor(group.ctype))
+    dplyr::mutate(samplesREMI = gsub("_", "", !!as.name(samplecol))) %>%
+    dplyr::mutate(group.ctype = paste0(samplesREMI, "_" , !!as.name(celltypecol))) %>%
+    dplyr::mutate(group.ctype = as.factor(group.ctype))
   rownames(obj@meta.data) <- temp.rownames
 
   Seurat::Idents(obj) <- "group.ctype"

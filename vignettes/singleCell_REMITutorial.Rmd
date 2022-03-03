@@ -10,6 +10,7 @@ vignette: >
 
 ```{r}
 library(remi)
+library(Seurat)
 ```
 
 Download data from: https://figshare.com/s/871cb53e8fb5206bf8d0
@@ -17,13 +18,13 @@ Download data from: https://figshare.com/s/871cb53e8fb5206bf8d0
 Dataset is from Laughney et al. Regenerative lineages and immune-mediated pruning in lung cancer metastasis (2020). Data has been integrated and scaled.
 
 Read in dataset formatted as a Seurat object
-```{r}
+```{r warning=FALSE}
 seurat.obj <- readRDS("~/Downloads/laughneytumor_forREMI.rds")
 ```
 
 ## Constructing a REMI network on subset of Laughney et al's single-cell RNA-sequencing dataset
 - Current run time ~ 20 minutes, working on speeding up the run time
-```{r}
+```{r warning=FALSE}
 #Cell types with few cells
 remove.celltypes <- c("MICROGLIA/MACROPHAGE", 
                       "NEUTROPHIL", 
@@ -43,7 +44,7 @@ data.obj <- setupSingleCell(seurat.obj,
                           thres=0.5,
                           expthres = 0.25)
 # Run REMI using default parameters
-remi.obj <- remi(data.obj$cellmarkers, data.obj)
+remi.obj <- remi(data.obj)
 ```
 
 Viewing REMI network

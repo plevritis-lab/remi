@@ -8,9 +8,9 @@ calculateSignificance(
   obj,
   l.chosen,
   r.chosen,
-  comm.chosen,
-  maxNum,
-  iterNum = 1000,
+  community.num,
+  maxNum = NULL,
+  iterNum = 100,
   seednum = 30,
   lambda = NULL
 )
@@ -22,7 +22,7 @@ calculateSignificance(
 
 \item{r.chosen}{Receptor in edge}
 
-\item{comm.chosen}{Community that edge is present in}
+\item{community.num}{Community that edge is present in}
 
 \item{iterNum}{= Number of permutations for p-value calculation}
 
