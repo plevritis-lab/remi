@@ -711,7 +711,7 @@ REMIPlot <- function(interactome,
                            annotationTrack = c("grid"), link.lwd = lwd_mat)
 
     if(legend == TRUE) {
-      legend("right",
+      legend("left",
              legend = names(grid.col),
              fill = grid.col,
              border=NA,

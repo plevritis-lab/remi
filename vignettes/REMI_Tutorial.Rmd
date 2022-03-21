@@ -41,7 +41,7 @@ kable(head(remi.obj$interactome, 5), digits = 5)
 ```
 
 Plotting option #1
-```{r fig.width=8,fig.height=10 warning=FALSE}
+```{r fig.width=8,fig.height=6, warning=FALSE}
 # Defining colors for each cell type
 grid.col <- c("F" = '#BB6A23', 
               "I" = "#195188", 
@@ -64,10 +64,10 @@ REMIPlot(remi.obj,
 # Calculate significance of an edge
 Enter in ligand and receptor of choice and which community number the pair is located in. The p-value is calculated with respect to the community. Please add cell type of ligand into ligand name (celltype_ligand) and cell type of receptor into receptor name (celltype_receptor) as input. Note: this step may take a while and we recommend only running it for LR pairs of interest.
 ```{r}
-pval <- calculateSignificance(remi.obj,
-                              l.chosen="F_CTGF",
-                              r.chosen="F_LRP6",
-                              comm.chosen="50")
+#pval <- calculateSignificance(remi.obj,
+                              # l.chosen="F_CTGF",
+                              # r.chosen="F_LRP6",
+                              # comm.chosen="50")
 ```
 
 
