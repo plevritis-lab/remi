@@ -1,6 +1,6 @@
 # REMI (Regularized Microenvironment Interactome)
 
-![alt text](https://github.com/plevritis-lab/remi/tree/master/extra/remi_figure.png?raw=true)
+![plot](https://github.com/plevritis-lab/remi/blob/master/extra/remi_figure.png?raw=true)
 
 ## Description
 The REMI package is written in R and is designed to predict ligand receptor interactions within a microenvironment given RNA-sequencing data. It regularizes communities of ligand and receptors that have a high probability of being transcriptionally linked. 
