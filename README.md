@@ -3,7 +3,7 @@
 ![plot](https://github.com/plevritis-lab/remi/blob/master/extra/remi_figure.png?raw=true)
 
 ## Description
-The REMI package is written in R and is designed to predict ligand receptor interactions within a microenvironment given RNA-sequencing data. It regularizes communities of ligand and receptors that have a high probability of being transcriptionally linked. 
+The REMI package is written in R and is designed to predict ecosystem-wide ligand receptor interactions within a microenvironment given RNA-sequencing data. REMI moves beyond pairwise interactions and accounts for the effect of 2+ cell types on system-level interactions. Specifically, it creates communities of multicellular genes and identifies which interactions have a high probability of being transcriptionally linked. 
 
 Manuscript: https://www.science.org/doi/10.1126/sciadv.abi4757
 
