@@ -26,6 +26,11 @@ REMI takes in normalized bulk or single-cell RNA-sequencing data as an input, wh
 
 [Single-cell RNA-Seq data in R](http://htmlpreview.github.io/?https://github.com/ayu1/remi/blob/master/vignettes/singleCell_REMITutorial.html)
 
+Using a different ligand-receptor database:
+
+```
+test
+```
 
 ## Contact
 Email: Alice Yu (ayu1@stanford.edu) or Sylvia Plevritis (sylvia.plevritis@stanford.edu)
