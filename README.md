@@ -26,11 +26,23 @@ REMI takes in normalized bulk or single-cell RNA-sequencing data as an input, wh
 
 [Single-cell RNA-Seq data in R](http://htmlpreview.github.io/?https://github.com/ayu1/remi/blob/master/vignettes/singleCell_REMITutorial.html)
 
-Using a different ligand-receptor database:
+To use a different ligand-receptor database (i.e. mouse), set the variable lr.adtabase as the new matrix/data frame. 
+Column names must be PairName, Ligand, and Receptor where PairName separates the Ligand and Recpetor by "_".
+Gene names in uploaded table must match gene names in input file. 
 
 ```
-test
+new.lr.table <- read_csv("newlrtable.csv")
+
+new.lr.table
+
+   Pair.Name    Ligand Receptor
+   <chr>        <chr>  <chr>   
+ 1 A2M_LRP1     A2M    LRP1    
+ 2 AANAT_MTNR1A AANAT  MTNR1A  
+ 3 AANAT_MTNR1B AANAT  MTNR1B 
+
+remi.res <- remi(obj, lr.database = new.lr.table)
 ```
 
 ## Contact
-Email: Alice Yu (ayu1@stanford.edu) or Sylvia Plevritis (sylvia.plevritis@stanford.edu)
+Email: Alice Yu (ayu1@alumni.stanford.edu) or Sylvia Plevritis (sylvia.plevritis@stanford.edu)
