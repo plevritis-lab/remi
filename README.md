@@ -3,7 +3,7 @@
 ![plot](https://github.com/plevritis-lab/remi/blob/master/extra/remi_figure.png?raw=true)
 
 ## Description
-The REMI package is written in R and is designed to predict ecosystem-wide ligand receptor interactions within a microenvironment given RNA-sequencing data. REMI moves beyond pairwise interactions and accounts for the effect of 2+ cell types on system-level interactions. Specifically, it creates communities of multicellular genes and identifies which interactions have a high probability of being transcriptionally linked. 
+REMI is designed to predict ecosystem-wide ligand receptor interactions within a microenvironment given RNA-sequencing data. The method moves beyond pairwise interactions and accounts for the effect of 2+ cell types on system-level interactions. Specifically, it creates communities of multicellular genes and identifies which interactions have a high probability of being transcriptionally linked. 
 
 Manuscript: https://www.science.org/doi/10.1126/sciadv.abi4757
 
@@ -26,9 +26,9 @@ REMI takes in normalized bulk or single-cell RNA-sequencing data as an input, wh
 
 [Single-cell RNA-Seq data in R](http://htmlpreview.github.io/?https://github.com/ayu1/remi/blob/master/vignettes/singleCell_REMITutorial.html)
 
-To use a different ligand-receptor database (i.e. mouse), set the variable lr.adtabase as the new matrix/data frame. 
+To use a different ligand-receptor database (i.e. mouse), set the variable lr.database as the new LR data table. 
 Column names must be PairName, Ligand, and Receptor where PairName separates the Ligand and Recpetor by "_".
-Gene names in uploaded table must match gene names in input file. 
+Gene symbols in uploaded table must match gene names in input file. 
 
 ```
 new.lr.table <- read_csv("newlrtable.csv")
