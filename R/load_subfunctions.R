@@ -116,7 +116,7 @@ clusterLabelProp <- function(net, clu, clu.labeled, labelednodes) {
 #'
 clusterLouvain <- function(net, commnums, communities) {
   suppressWarnings(
-  if(unique(commnums) == unique(communities)) {
+  if(length(unique(commnums)) == length(unique(communities))) {
     cat("\nAll communities are larger than sample size\n")
     final.comms <- NA
   } else {
@@ -125,7 +125,7 @@ clusterLouvain <- function(net, commnums, communities) {
   for(cc in commnums) {
     comm.net <- igraph::induced_subgraph(net,names(communities[communities==cc]))
     louvain.comms <- igraph::membership(igraph::cluster_louvain(comm.net))
-    suppressWarnings(if(is.na(final.comms)) {
+    suppressWarnings(if(sum(is.na(final.comms)) == 1) {
       final.comms <- louvain.comms
     } else {
       final.comms <- c(final.comms, louvain.comms+max(final.comms))
