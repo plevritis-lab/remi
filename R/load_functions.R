@@ -918,7 +918,7 @@ setupSingleCell <- function(obj, sample.col,
 
   cat("Averaging expression\n")
 
-  pseudobulk <- SingleToBulk(obj, assay, sample.col, celltype.col)
+  pseudobulk <- SingleToBulk(obj, assay="SCT", samplecol=sample.col, celltypecol = celltype.col)
 
   num.markers <- length(pseudobulk$cellmarkers) - length(remove.markers)
   print(num.markers)
@@ -1059,7 +1059,7 @@ SingleToBulk <- function(obj, assay, samplecol, celltypecol) {
   Seurat::Idents(obj) <- "group.ctype"
   avg.obj <- Seurat::AverageExpression(obj, return.seurat=T, assays=assay)
 
-  avg.dat <- Seurat::GetAssayData(avg.obj, "data") %>% as.matrix
+  avg.dat <- Seurat::GetAssayData(avg.obj, assay) %>% as.matrix
 
   avg.dat[is.na(avg.dat)] <- 0
 
